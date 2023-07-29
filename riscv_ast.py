@@ -12,6 +12,10 @@ class Reg:
     def __repr__(self):
         return "x" + str(self.num)
 
+class Var(Reg):
+    def __repr__(self):
+        return "a" + str(self.num)
+
 class Zero(Reg):
     def __init__(self):
         self.num = 0
