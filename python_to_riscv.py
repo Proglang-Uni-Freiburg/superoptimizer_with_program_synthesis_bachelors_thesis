@@ -9,7 +9,7 @@ class Compiler:
 
     def __init__(self):
         return
-    
+
     def compile(self, e):
         last_reg = self.transform_expr(e)  # final result, equals exit code of program
         self.result += ["addi a7, zero, 93", f"addi a0, {last_reg}, 0", "ecall"]  # add exit to program at the end
