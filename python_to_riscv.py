@@ -4,6 +4,7 @@ from typing import List
 
 
 class Compiler:
+    temp_res = ReturnReg()
     avail_const = [Reg(x) for x in [5, 6, 7, 28, 29, 30, 31]]
     avail_var = list(range(7, 1, -1))
     used_var = {}
@@ -13,8 +14,8 @@ class Compiler:
         return
 
     def compile(self, e):
-        last_reg = self.transform_expr(e)  # final result, equals exit code of program
-        self.result += ["addi a7, zero, 93", f"addi a0, {last_reg}, 0", "ecall"]  # add exit to program at the end
+        self.transform_expr(e)  # final result, equals exit code of program
+        self.result += ["addi a7, zero, 93", "ecall"]  # add exit to program at the end
         return "\n".join(self.result)
 
     def transform_const(self, val) -> Reg:
@@ -45,27 +46,27 @@ class Compiler:
             case BinOp(left, Add(), right):
                 reg1 = self.transform_expr(left)  # problem: expr of type (1 + (2 + (3 + (4 + ...))))
                 reg2 = self.transform_expr(right)
-                self.result.append(repr(Instr("add", reg1, reg1, reg2)))
+                self.result.append(repr(Instr("add", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
-                return reg1
+                return self.temp_res
             case BinOp(left, Sub(), right):
                 reg1 = self.transform_expr(left)
                 reg2 = self.transform_expr(right)
-                self.result.append(repr(Instr("sub", reg1, reg1, reg2)))
+                self.result.append(repr(Instr("sub", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
-                return reg1
+                return self.temp_res
             case BinOp(left, Mult(), right):
                 reg1 = self.transform_expr(left)
                 reg2 = self.transform_expr(right)
-                self.result.append(repr(Instr("mul", reg1, reg1, reg2)))
+                self.result.append(repr(Instr("mul", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
-                return reg1
+                return self.temp_res
             case BinOp(left, Div(), right):
                 reg1 = self.transform_expr(left)
                 reg2 = self.transform_expr(right)
-                self.result.append(repr(Instr("div", reg1, reg1, reg2)))
+                self.result.append(repr(Instr("div", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
-                return reg1
+                return self.temp_res
             case UnaryOp(USub(), rest):
                 reg = self.transform_expr(rest)
                 self.result.append(repr(Instr("Sub", reg, Zero(), reg)))

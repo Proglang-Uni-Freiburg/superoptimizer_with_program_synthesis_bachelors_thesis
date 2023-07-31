@@ -31,6 +31,11 @@ class Zero(Reg):
         self.num = 0
 
 
+class ReturnReg(Var):
+    def __init__(self):
+        self.num = 0
+
+
 # Representation of instructions with a variable number of arguments. Only represents instructions with a destination
 class Instr:
     __match_args__ = ("instr", "args")
