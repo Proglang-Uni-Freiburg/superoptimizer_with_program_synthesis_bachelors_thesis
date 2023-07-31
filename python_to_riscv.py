@@ -5,6 +5,8 @@ from typing import List
 
 class Compiler:
     avail_const = [Reg(x) for x in [5, 6, 7, 28, 29, 30, 31]]
+    avail_var = list(range(7, 1, -1))
+    used_var = {}
     result: List[str] = [".global _start", "", "_start:"]
 
     def __init__(self):
@@ -24,7 +26,14 @@ class Compiler:
             raise Exception("ran out of temporary registers!")  # TODO: free up operations in this case?
 
     def transform_var(self, val) -> Reg:
-        return Var(val[1:])
+        if val in self.used_var.keys():
+            return self.used_var[val]
+        if len(self.avail_var) > 1:
+            free_num = self.avail_var.pop()
+            self.used_var[val] = Var(free_num)
+            return self.used_var[val]
+        else:
+            raise Exception("ran out of argument registers!")
 
     def check_free(self, reg: Reg):  # frees reg for reuse if it was a constant
         if type(reg) == Var:
