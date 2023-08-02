@@ -1,5 +1,6 @@
 # base class for arithmetic RISC V assembly instructions
 from typing import List, Callable, Any
+from z3 import ArithRef
 
 
 def match_op(op: str) -> Callable[[Any, Any], Any]:
@@ -66,7 +67,7 @@ class Instr:
     instr: str
     # args: Tuple[Reg | int]  # register or immediate
 
-    def __init__(self, instr: str, *args: Reg | int):
+    def __init__(self, instr: str, *args: Reg | int | ArithRef):
         self.instr = instr.lower()
         self.args = args
 
