@@ -31,13 +31,13 @@ class Compiler:
             return self.used_var[val]
         if len(self.avail_var) > 1:
             free_num = self.avail_var.pop()
-            self.used_var[val] = Var(free_num, val)
+            self.used_var[val] = Regvar(free_num, val)
             return self.used_var[val]
         else:
             raise Exception("ran out of argument registers!")
 
     def check_free(self, reg: Reg):  # frees reg for reuse if it was a constant
-        if type(reg) == Var:
+        if type(reg) == Regvar:
             return
         self.avail_const.append(reg)
 

@@ -1,22 +1,22 @@
 from z3 import *
 from riscv_ast import *
+from typing import Callable, List
 
 # TODO: cleanup!
 
 
-
 class Synthesizer:
-    # goal_func: function
-    # args: list  # list of function arguments
-    to_analyze = [repr(ReturnReg())] + [repr(Reg(x)) for x in [5, 6, 7, 28, 29, 30, 31]]
-    z3args = {}
+    goal_func: Callable[..., int]
+    args: List[str]  # list of function arguments
+    to_analyze: List[str] = [repr(ReturnReg())] + [repr(Reg(x)) for x in [5, 6, 7, 28, 29, 30, 31]]
+    z3args: dict[str, ArithRef] = {}
 
-    def __init__(self, f, args):
+    def __init__(self, f: Callable[..., int], args: List[str]):
         self.goal_func = f
-        self.args = args  # TODO this needs to be converted from function args to proper args starting with a
+        self.args = args
 
     # ALERT THIS HAS BAD RUNTIME FOR SURE
-    def match_instr(self, instrlist, goaldest):
+    def match_instr(self, instrlist: List[Instr], goaldest: Reg):
         # idea: go bottom up, use new variables for results. auflösen, sozusagen! inverse of python to riscv really.
         # constants, zero and arguments stay unchanged. go thru temps, result reg
         # perhaps change rule about arguments later on, as of now don't generate anything that overwrites arguments
@@ -74,5 +74,5 @@ class Synthesizer:
 
 if __name__ == "__main__":
     synth = Synthesizer(lambda x1: x1 + 1, ['x1'])
-    synth.verify([Instr("addi", ReturnReg(), Var(2, 'x1'), 1)])
-    synth.verify([Instr("addi", Reg(31), Zero(), 1), Instr("add", ReturnReg(), Reg(31), Var(2, 'x1'))])
+    synth.verify([Instr("addi", ReturnReg(), Regvar(2, 'x1'), 1)])
+    synth.verify([Instr("addi", Reg(31), Zero(), 1), Instr("add", ReturnReg(), Reg(31), Regvar(2, 'x1'))])
