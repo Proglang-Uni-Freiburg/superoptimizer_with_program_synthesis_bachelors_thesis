@@ -1,6 +1,7 @@
 from ast import *
 from python_to_riscv import *
 from ast_to_func import *
+from run_riscv import *
 
 
 if __name__ == "__main__":
@@ -13,3 +14,4 @@ if __name__ == "__main__":
         case Expression(body=to_analyse):
             res = c.compile(to_analyse)
             print('\n'.join([repr(i) for i in res]))
+            print("output with all arguments set to 1, 2, ... , n:", run_riscv(res, example_dict))
