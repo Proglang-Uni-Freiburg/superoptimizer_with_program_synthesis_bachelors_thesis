@@ -1,14 +1,24 @@
-# superoptimizer_with_program_synthesis
-
-Arbeitstitel: Superoptimizer mittels Programmsynthese
+# RISC-V Superoptimizer with Program Synthesis
 
 
-Mit der Arbeit wollen wir ein Verfahren finden, mit dem optimierte Instruktionssequenzen für Ausdrücke mittels Programmsynthese gefunden werden. Der Startpunkt ist eine unoptimierte Sequenz, gesucht ist eine kürzere (oder schnellere) Sequenz, die die gleiche Funktion berechnet. Vorschlag: betrachte Instruktionssequenzen für RISC-V.
+### About
+This project aims to explore the automatic generation of RISC-V Code for Integer Arithmetic.
 
 
-Mögliche Vorgehensweise  
-    • Schreibe einen einfachen Codegenerator für arithmetische Ausdrücke (64bit Arithmetik), der bottom-up die Knoten des Ausdrucks in Register “verwandelt”. D.h. Konstanten werden in temporäre Register geladen, Operationen werden auf den Argumentregistern ausgeführt und das Ergebnis in ein Register abgelegt.  
-    • Erzeuge aus einem Ausdruck Code und versuche dann mittels Programmsynthese äquivalenten Code zu finden. Verwende SMT zum Testen der Äquivalenz.   
-    • Spätere Fragen: wie kann man den Suchraum intelligent einschränken? Wie kann man die Suche durch feedback vom SMT-Solver steuern?  
-    • Später: Verfeinerung des Codegenerators, falls sinnvoll für den Befehlssatz: Konstanten c werden symbolisch behandelt und mit einem Konstraint wie 0<=c<256 versehen.  
-    • Später: logische Operationen? Gleitkomma (zur Optimierung von Code für ML Anwendungen oder Simulation)?  
+Current capabilities are:  
+- Converting user input to a python arithmetic function (any occuring variables are converted to function arguments)
+- Running RISC-V Code for arithmetic directly in Python without compilation
+- Generating RISC-V Assembler code for arithmetic from user input using a bottom-up approach
+- Checking if a given RISC-V arithmetic function and a python arithmetic function are equivalent (using Z3)
+- By combining the above, checking the equivalence of two RISC-V arithmetic functions are equivalent
+
+
+next todo: synthesizing RISC-V code using Z3. This can be passed back and forth from the existing verifier to create a complete CEGIS synthesizer.
+
+
+Link to Thesis Report: https://www.overleaf.com/read/ghwmsjzvbvdn
+
+### Usage
+```input_to_naive_riscv.py``` currently runs in the terminal and showcases the naive bottom up convertion approach.  
+Input: Arithmetic expression that may include variables and Integer constants. Supported operators are +, -, *, / (computed as //).  
+```synthesize.py``` currently only computes an example of checking equivalence of a python function and RISC-V function. Should succeed twice
