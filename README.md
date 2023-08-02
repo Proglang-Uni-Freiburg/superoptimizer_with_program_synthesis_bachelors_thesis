@@ -11,9 +11,10 @@ Current capabilities are:
 - Generating RISC-V Assembler code for arithmetic from user input using a bottom-up approach
 - Checking if a given RISC-V arithmetic function and a python arithmetic function are equivalent (using Z3)
 - By combining the above, checking the equivalence of two RISC-V arithmetic functions are equivalent
+- There is a RISC-V synthesizer that generates code that matches input-output examples. Currently only works if the solution can be a one-liner.
 
 
-next todo: synthesizing RISC-V code using Z3. This can be passed back and forth from the existing verifier to create a complete CEGIS synthesizer.
+next todo: extend the RISC-V synthesizer from just one-liners and combine with existing equivalence checker
 
 
 Link to Thesis Report: https://www.overleaf.com/read/ghwmsjzvbvdn
