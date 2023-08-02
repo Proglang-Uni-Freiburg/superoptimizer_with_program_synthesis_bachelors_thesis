@@ -8,30 +8,30 @@ class Compiler:
     avail_const = [Reg(x) for x in [5, 6, 7, 28, 29, 30, 31]]
     avail_var = list(range(7, 1, -1))
     used_var = {}
-    result: List[str] = [".global _start", "", "_start:"]
+    result: List[Instr] = [Instr(".global _start"), Instr(""), Instr("_start:")]
 
     def __init__(self):
         return
 
     def compile(self, e):
         self.transform_expr(e)  # final result, equals exit code of program
-        self.result += ["addi a7, zero, 93", "ecall"]  # add exit to program at the end
-        return "\n".join(self.result)
+        self.result += [Instr("addi", Var(7, 'null'), Zero(), 93), Instr("ecall")]  # add exit to program at the end
+        return self.result
 
     def transform_const(self, val) -> Reg:
         if len(self.avail_const) > 1:
             reg = self.avail_const.pop()
-            self.result.append(repr(Assign(reg, val)))
+            self.result.append(Assign(reg, val))
             return reg
         else:
             raise Exception("ran out of temporary registers!")  # TODO: free up operations in this case?
 
-    def transform_var(self, val) -> Reg:
+    def transform_var(self, val: str) -> Reg:
         if val in self.used_var.keys():
             return self.used_var[val]
         if len(self.avail_var) > 1:
             free_num = self.avail_var.pop()
-            self.used_var[val] = Var(free_num)
+            self.used_var[val] = Var(free_num, val)
             return self.used_var[val]
         else:
             raise Exception("ran out of argument registers!")
@@ -46,30 +46,30 @@ class Compiler:
             case BinOp(left, Add(), right):
                 reg1 = self.transform_expr(left)  # problem: expr of type (1 + (2 + (3 + (4 + ...))))
                 reg2 = self.transform_expr(right)
-                self.result.append(repr(Instr("add", self.temp_res, reg1, reg2)))
+                self.result.append((Instr("add", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
                 return self.temp_res
             case BinOp(left, Sub(), right):
                 reg1 = self.transform_expr(left)
                 reg2 = self.transform_expr(right)
-                self.result.append(repr(Instr("sub", self.temp_res, reg1, reg2)))
+                self.result.append((Instr("sub", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
                 return self.temp_res
             case BinOp(left, Mult(), right):
                 reg1 = self.transform_expr(left)
                 reg2 = self.transform_expr(right)
-                self.result.append(repr(Instr("mul", self.temp_res, reg1, reg2)))
+                self.result.append((Instr("mul", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
                 return self.temp_res
             case BinOp(left, Div(), right):
                 reg1 = self.transform_expr(left)
                 reg2 = self.transform_expr(right)
-                self.result.append(repr(Instr("div", self.temp_res, reg1, reg2)))
+                self.result.append((Instr("div", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
                 return self.temp_res
             case UnaryOp(USub(), rest):
                 reg = self.transform_expr(rest)
-                self.result.append(repr(Instr("Sub", reg, Zero(), reg)))
+                self.result.append((Instr("Sub", reg, Zero(), reg)))
                 return reg
             case Name(id=val):
                 return self.transform_var(val)
