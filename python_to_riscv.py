@@ -4,24 +4,24 @@ from typing import List
 
 
 class Compiler:
-    temp_res = ReturnReg()
-    avail_const = [Reg(x) for x in [5, 6, 7, 28, 29, 30, 31]]
-    avail_var = list(range(7, 1, -1))
-    used_var = {}
-    result: List[Instr] = [Instr(".global _start"), Instr(""), Instr("_start:")]
+    temp_res: Reg = ReturnReg()
+    avail_const: List[Reg] = [Reg(x) for x in [5, 6, 7, 28, 29, 30, 31]]
+    avail_var: List[int] = list(range(7, 1, -1))
+    used_var: dict[str, Reg] = {}
+    result: List[Instr] = prog_start
 
     def __init__(self):
         return
 
-    def compile(self, e):
+    def compile(self, e: AST):
         self.transform_expr(e)  # final result, equals exit code of program
-        self.result += [Instr("addi", Var(7, 'null'), Zero(), 93), Instr("ecall")]  # add exit to program at the end
+        self.result += prog_end
         return self.result
 
-    def transform_const(self, val) -> Reg:
+    def transform_const(self, val: int) -> Reg:
         if len(self.avail_const) > 1:
             reg = self.avail_const.pop()
-            self.result.append(Assign(reg, val))
+            self.result.append(Regassign(reg, val))
             return reg
         else:
             raise Exception("ran out of temporary registers!")  # TODO: free up operations in this case?
@@ -41,7 +41,7 @@ class Compiler:
             return
         self.avail_const.append(reg)
 
-    def transform_expr(self, e):
+    def transform_expr(self, e: AST):
         match e:
             case BinOp(left, Add(), right):
                 reg1 = self.transform_expr(left)  # problem: expr of type (1 + (2 + (3 + (4 + ...))))

@@ -1,7 +1,8 @@
 from ast import *
+from typing import Callable, Tuple, List
 
 
-def expr_to_func(ast_in):
+def expr_to_func(ast_in: Expression) -> Tuple[Callable[[List[int]], int], list[str]]:
     expr_vars = []
     expr_body = Constant(value=0)
     for node in walk(ast_in):

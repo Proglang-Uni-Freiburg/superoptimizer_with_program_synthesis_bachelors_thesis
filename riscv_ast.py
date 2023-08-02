@@ -1,24 +1,25 @@
 # base class for arithmetic RISC V assembly instructions
-from typing import Tuple
+from typing import List, Callable, Any
 
 
-def match_op(op):
+def match_op(op: str) -> Callable[[Any, Any], Any]:
     match op:
         case "add" | "addi":
             return lambda x, y: x + y
         case "sub" | "subi":
             return lambda x, y: x - y
-        case "div" | "divi":
-            return lambda x, y: x * y
         case "mul" | "muli":
-            return lambda x, y: x / y
+            return lambda x, y: x * y
+        case "div" | "divi":
+            return lambda x, y: x // y
         case _:
             raise Exception("Could not match Instruction Operator")
+
 
 # Representation for Registers in RISC V. Does not consider floating point registers because we never use those
 class Reg:
     num: int
-    const_regs = [5, 6, 7, 28, 29, 30, 31]
+    const_regs: List[int] = [5, 6, 7, 28, 29, 30, 31]
 
     def __init__(self, num: int):
         self.num = num
@@ -29,7 +30,7 @@ class Reg:
 
 
 class Var(Reg):
-    var_regs = list(range(2, 8))
+    var_regs: List[int] = list(range(2, 8))
     name: str
 
     def __init__(self, num: int, name: str):
@@ -72,8 +73,11 @@ class Instr:
         return self.instr + " " + ", ".join(repr(a) for a in self.args)
 
 
-class Assign(Instr):
-
+class Regassign(Instr):
     def __init__(self, reg: Reg, num: int):
         self.instr = "addi"
         self.args = (reg, Zero(), num)
+
+
+prog_start: List[Instr] = [Instr(".global _start"), Instr(""), Instr("_start:")]
+prog_end: List[Instr] = [Instr("addi", Var(7, 'null'), Zero(), 93), Instr("ecall")]

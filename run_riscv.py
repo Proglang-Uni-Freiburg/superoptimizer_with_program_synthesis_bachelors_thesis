@@ -1,7 +1,8 @@
 from riscv_ast import *
 from typing import List
 
-def run_riscv(riscv: List[Instr], args: dict) -> int:
+
+def run_riscv(riscv: List[Instr], args: dict[str, int]) -> int:
     r = 0
     regs = args.copy()
     regs[py_name(Zero())] = 0
