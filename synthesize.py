@@ -1,5 +1,6 @@
 from z3 import *
 from riscv_ast import *
+from generate_riscv import *
 from typing import Callable, List
 
 # TODO: cleanup!
@@ -49,7 +50,7 @@ class Synthesizer:
                 case _:
                     raise Exception("Not a valid RISC-V instruction")
 
-    def verify(self, guess: list[Instr]):
+    def verify(self, guess: list[Instr]):  # TODO: currently only works with valid programs. add try-except
         s = Solver()
 
         for arg in self.args:
@@ -71,8 +72,51 @@ class Synthesizer:
         else:
             print("nope :(")
 
+    def cegis_counter(self, guess:list[Instr]):
+        s = Solver()
+
+        self.z3args[repr(Zero())] = Int("Zero")
+        s.add(self.z3args[repr(Zero())] == 0)
+
+        for arg in self.args:
+            self.z3args[arg] = Int(arg)
+            s.add(self.z3args[arg] < 256)
+            s.add(self.z3args[arg] > -256)
+
+
+        guess.reverse()
+
+        unrolled_expr = self.match_instr(guess, ReturnReg())
+        s.add(unrolled_expr != self.goal_func(*[self.z3args[x] for x in self.args]))
+
+        if s.check() == sat:
+            del self.z3args[repr(Zero())]
+            return [s.model().evaluate(x) for x in self.z3args.values()], False
+        else:
+            print("Found Solution!")
+            return [], True
+
+    def cegis(self):
+        gen = RiscvGen(self.args)
+        example_args = [0 for x in self.args]
+        arg_history = [example_args]
+        examples = [(example_args, self.goal_func(*example_args))]
+        while(True):
+            guess = gen.naive_gen(examples)
+            print(guess)
+            example_args, success = self.cegis_counter(guess)
+            if success:
+                return guess
+            examples += [(example_args, self.goal_func(*example_args))]
+
+
+
+
 
 if __name__ == "__main__":
     synth = Synthesizer(lambda x1: x1 + 1, ['x1'])
     synth.verify([Instr("addi", ReturnReg(), Regvar(2, 'x1'), 1)])
     synth.verify([Instr("addi", Reg(31), Zero(), 1), Instr("add", ReturnReg(), Reg(31), Regvar(2, 'x1'))])
+    print(synth.cegis_counter([Instr("addi", Reg(31), Zero(), 2), Instr("add", ReturnReg(), Reg(31), Regvar(2, 'x1'))]))
+    print("======================")
+    print("\n" + "\n".join(repr(x) for x in synth.cegis()))
