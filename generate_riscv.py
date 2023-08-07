@@ -102,7 +102,7 @@ class RiscvGen():
         c = Int('c' + str(depth))
         self.consts += [c]
         avail_regs = ([Reg.const_regs[i] for i in range((depth) + 1)] if depth <= len(Reg.const_regs) else Reg.const_regs) + \
-                     [Zero(), ReturnReg()] + self.arg_regs
+            [Zero(), ReturnReg()] + self.arg_regs
 
         option = []
 
