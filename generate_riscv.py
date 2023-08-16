@@ -125,75 +125,133 @@ class RiscvGen():
                         possibilities += [[Instr(op, dest, arg1, arg2)] + x for x in copy if x[0].args[1] == dest]
         return possibilities
 
-    # NOTE: avoid calling this from the start each time, i.e. only generate starting once and then just add onto it if nothing fitting is found
     # smart meaning: only try valid code. also don't generate duplicates
     def smart_sketches(self, depth: int) -> Iterable:
+        
+        def helper(iter: int, reg_iter: int, temp_r: List[Instr], avail_regs: List[Reg]):
+            if iter == 0:
+                possibilities = []
+                for op in self.arith_ops_imm:
+                    possibilities += [temp_r + [Instr(op, ReturnReg(), arg, self.consts[iter])] for arg in avail_regs]
+                for op in self.arith_ops:
+                    possibilities += [temp_r + [Instr(op, ReturnReg(), arg1, arg2)] for arg1, arg2 in list(itertools.product(avail_regs, avail_regs))]
+                for p in possibilities:
+                    yield p
+                return
+
+            new_regs = avail_regs.copy()
+            new_r = temp_r.copy()
+            if reg_iter < len(Reg.const_regs):
+                new_regs.append(Reg(Reg.const_regs[reg_iter]))
+            diff = [x for x in new_regs if x not in avail_regs]
+
+            for op in self.arith_ops_imm:
+                for dest in new_regs:
+                    for arg in avail_regs + [Zero()]:
+                        new_r += [Instr(op, dest, arg, self.consts[iter])]
+                        if dest in diff:
+                            yield from helper(iter - 1, reg_iter + 1, new_r, new_regs)
+                        else:
+                            yield from helper(iter - 1, reg_iter, new_r, avail_regs)
+                        new_r.pop()
+
+            for op in self.arith_ops:
+                for dest in new_regs:
+                    for arg1 in avail_regs + [Zero()]:
+                        for arg2 in avail_regs + [Zero()]:
+                            # eliminate redundant programs here
+                            if (op == "mul" or op == "add") and repr(arg1) > repr(arg2):
+                                continue
+
+                            new_r += [Instr(op, dest, arg1, arg2)]
+                            if dest in diff:
+                                yield from helper(iter - 1, reg_iter + 1, new_r, new_regs)
+                            else:
+                                yield from helper(iter - 1, reg_iter, new_r, avail_regs)
+                            new_r.pop()
+
         possibilities = []
         for i in range(depth + 1):
             c = Int('c' + str(i))
             self.consts += [c]
         avail_regs = self.arg_regs
-        possibilities = self.helper(depth, 0, 0, [], avail_regs)
+        possibilities = helper(depth, 0, [], avail_regs)
         
         return possibilities
 
-    def helper(self, iter: int, reg_iter: int, const_iter: int, temp_r: List[Instr], avail_regs: List[Reg]):
-        if iter == 0:
-            possibilities = []
+    # the same as smart_sketches, except with DP
+    def dp_sketches(self, depth: int):
+
+        def helper(iter: int, reg_iter: int, temp_r: List[Instr], avail_regs: List[Reg], cache: dict):
+            result = []
+            if (iter, reg_iter) in cache.keys():
+                return cache[iter, reg_iter]
+            if iter == 0:
+                possibilities = []
+                for op in self.arith_ops_imm:
+                    possibilities += [[Instr(op, ReturnReg(), arg, self.consts[iter])] for arg in avail_regs]
+                for op in self.arith_ops:
+                    possibilities += [[Instr(op, ReturnReg(), arg1, arg2)] for arg1, arg2 in list(itertools.product(avail_regs, avail_regs))]
+                return possibilities
+
+            new_regs = avail_regs.copy()
+            new_r = temp_r.copy()
+            if reg_iter < len(Reg.const_regs):
+                new_regs.append(Reg(Reg.const_regs[reg_iter]))
+            diff = [x for x in new_regs if x not in avail_regs]
+
             for op in self.arith_ops_imm:
-                possibilities += [temp_r + [Instr(op, ReturnReg(), arg, self.consts[const_iter])] for arg in avail_regs]
-            for op in self.arith_ops:
-                possibilities += [temp_r + [Instr(op, ReturnReg(), arg1, arg2)] for arg1, arg2 in list(itertools.product(avail_regs, avail_regs))]
-            for p in possibilities:
-                yield p
-                return
-
-        new_regs = avail_regs.copy()
-        new_r = temp_r.copy()
-        if reg_iter < len(Reg.const_regs):
-            new_regs.append(Reg(Reg.const_regs[reg_iter]))
-        diff = [x for x in new_regs if x not in avail_regs]
-
-        for op in self.arith_ops_imm:
-            for dest in new_regs:
-                for arg in avail_regs + [Zero()]:
-                    last_instr = "invalid" if len(new_r) == 0 else new_r[-1].instr
-                    # eliminate redundant programs: consecutive addition/subtraction of constants on same dest is unnecessary
-                    if (op in ["addi", "subi"]) and len(new_r) > 0 and last_instr in ["addi", "subi"] and bool(new_r[-1].args[0] == dest):
-                        continue
-                    new_r += [Instr(op, dest, arg, self.consts[const_iter])]
-                    if dest in diff:
-                        yield from self.helper(iter - 1, reg_iter + 1, const_iter + 1, new_r, new_regs)
-                    else:
-                        yield from self.helper(iter - 1, reg_iter, const_iter + 1, new_r, avail_regs)
-                    new_r.pop()
-
-        for op in self.arith_ops:
-            for dest in new_regs:
-                for arg1 in avail_regs + [Zero()]:
-                    for arg2 in avail_regs + [Zero()]:
-                        # eliminate redundant programs here
-                        if (op == "mul" or op == "add") and repr(arg1) > repr(arg2):
-                            continue
-
-                        new_r += [Instr(op, dest, arg1, arg2)]
+                for dest in new_regs:
+                    for arg in avail_regs + [Zero()]:
+                        new_instr = [Instr(op, dest, arg, self.consts[iter])]
+                        new_r += new_instr
                         if dest in diff:
-                            yield from self.helper(iter - 1, reg_iter + 1, const_iter, new_r, new_regs)
+                            res = helper(iter - 1, reg_iter + 1, new_r, new_regs, cache)
+                            cache[iter - 1, reg_iter + 1] = res
+                            result += [new_instr + x for x in res]
                         else:
-                            yield from self.helper(iter - 1, reg_iter, const_iter, new_r, avail_regs)
+                            res = helper(iter - 1, reg_iter, new_r, avail_regs, cache)
+                            cache[iter - 1, reg_iter] = res
+                            result += [new_instr + x for x in res]
                         new_r.pop()
 
-    # same as smart sketches, but with dynamic programming to reduce duplication
-    def dynamic_sketches(self):
-        pass
+            for op in self.arith_ops:
+                for dest in new_regs:
+                    for arg1 in avail_regs + [Zero()]:
+                        for arg2 in avail_regs + [Zero()]:
+                            # eliminate redundant programs here
+                            if (op == "mul" or op == "add") and repr(arg1) > repr(arg2):
+                                continue
+                            
+                            new_instr = [Instr(op, dest, arg1, arg2)]
+                            new_r += new_instr
+                            if dest in diff:
+                                res = helper(iter - 1, reg_iter + 1, new_r, new_regs, cache)
+                                cache[iter - 1, reg_iter + 1] = res
+                                result += [new_instr + x for x in res]
+                            else:
+                                res = helper(iter - 1, reg_iter, new_r, avail_regs, cache)
+                                cache[iter - 1, reg_iter] = res
+                                result += [new_instr + x for x in res]
+                            new_r.pop()
+            return result
 
+        possibilities = []
+        for i in range(depth + 1):
+            c = Int('c' + str(i))
+            self.consts += [c]
+        avail_regs = self.arg_regs
+        possibilities = helper(depth, 0, [], avail_regs, {})
+        
+        return possibilities
 
 if __name__ == "__main__":
     gen = RiscvGen(['x', 'y'])  # NOTE: order of arguments always has to be the same in the lists
     r = gen.naive_gen([([3, 2], 0), ([6, 1], 1)])
     print(repr(r))
 
-    print("Number of possible program sketches with length 3:", len(list(gen.smart_sketches(2))))  # 1.5mil possibilties...
+    # print("Number of possible program sketches with length 3:", len(list(gen.smart_sketches(2))), sep='\n')  # 1.5mil possibilties...
+    print("Number of possible program sketches with length 4:", len((gen.dp_sketches(3))), sep='\n')  # 1.5mil possibilties...
 
     r = gen.smart_gen([([3, 2], 0), ([6, 1], 1)], 0)
     print(repr(r))
