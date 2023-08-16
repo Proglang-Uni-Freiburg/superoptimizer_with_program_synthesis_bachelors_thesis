@@ -83,7 +83,7 @@ class RiscvGen():
                 self.s.pop()
                 continue
             if self.s.check() == sat:
-                print(count)
+                print("Number of invalid programs checked:", count)
                 return self.replace_consts(p), min_prog_length
             self.s.pop()
 
@@ -127,7 +127,7 @@ class RiscvGen():
 
     # NOTE: avoid calling this from the start each time, i.e. only generate starting once and then just add onto it if nothing fitting is found
     # smart meaning: only try valid code. also don't generate duplicates
-    def smart_sketches(self, depth: int):
+    def smart_sketches(self, depth: int) -> Iterable:
         possibilities = []
         for i in range(depth + 1):
             c = Int('c' + str(i))
@@ -137,15 +137,16 @@ class RiscvGen():
         
         return possibilities
 
-    def helper(self, iter: int, reg_iter: int, const_iter: int, temp_r: List[Instr], avail_regs: List[Reg]) -> List[List[Instr]]:
-        result = []
+    def helper(self, iter: int, reg_iter: int, const_iter: int, temp_r: List[Instr], avail_regs: List[Reg]):
         if iter == 0:
             possibilities = []
             for op in self.arith_ops_imm:
                 possibilities += [temp_r + [Instr(op, ReturnReg(), arg, self.consts[const_iter])] for arg in avail_regs]
             for op in self.arith_ops:
                 possibilities += [temp_r + [Instr(op, ReturnReg(), arg1, arg2)] for arg1, arg2 in list(itertools.product(avail_regs, avail_regs))]
-            return possibilities
+            for p in possibilities:
+                yield p
+                return
 
         new_regs = avail_regs.copy()
         new_r = temp_r.copy()
@@ -156,25 +157,31 @@ class RiscvGen():
         for op in self.arith_ops_imm:
             for dest in new_regs:
                 for arg in avail_regs + [Zero()]:
+                    last_instr = "invalid" if len(new_r) == 0 else new_r[-1].instr
+                    # eliminate redundant programs: consecutive addition/subtraction of constants on same dest is unnecessary
+                    if (op in ["addi", "subi"]) and len(new_r) > 0 and last_instr in ["addi", "subi"] and bool(new_r[-1].args[0] == dest):
+                        continue
                     new_r += [Instr(op, dest, arg, self.consts[const_iter])]
                     if dest in diff:
-                        result += self.helper(iter - 1, reg_iter + 1, const_iter + 1, new_r, new_regs)
+                        yield from self.helper(iter - 1, reg_iter + 1, const_iter + 1, new_r, new_regs)
                     else:
-                        result += self.helper(iter - 1, reg_iter, const_iter + 1, new_r, avail_regs)
+                        yield from self.helper(iter - 1, reg_iter, const_iter + 1, new_r, avail_regs)
                     new_r.pop()
 
         for op in self.arith_ops:
             for dest in new_regs:
                 for arg1 in avail_regs + [Zero()]:
                     for arg2 in avail_regs + [Zero()]:
+                        # eliminate redundant programs here
+                        if (op == "mul" or op == "add") and repr(arg1) > repr(arg2):
+                            continue
+
                         new_r += [Instr(op, dest, arg1, arg2)]
                         if dest in diff:
-                            result += self.helper(iter - 1, reg_iter + 1, const_iter, new_r, new_regs)
+                            yield from self.helper(iter - 1, reg_iter + 1, const_iter, new_r, new_regs)
                         else:
-                            result += self.helper(iter - 1, reg_iter, const_iter, new_r, avail_regs)
+                            yield from self.helper(iter - 1, reg_iter, const_iter, new_r, avail_regs)
                         new_r.pop()
-
-        return result
 
     # same as smart sketches, but with dynamic programming to reduce duplication
     def dynamic_sketches(self):
@@ -186,7 +193,7 @@ if __name__ == "__main__":
     r = gen.naive_gen([([3, 2], 0), ([6, 1], 1)])
     print(repr(r))
 
-    print(len(gen.smart_sketches(3)))  # 1.5mil possibilties...
+    print("Number of possible program sketches with length 3:", len(list(gen.smart_sketches(2))))  # 1.5mil possibilties...
 
     r = gen.smart_gen([([3, 2], 0), ([6, 1], 1)], 0)
     print(repr(r))
