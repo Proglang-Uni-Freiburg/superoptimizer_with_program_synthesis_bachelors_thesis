@@ -67,6 +67,24 @@ class Compiler:
                 self.result.append((Instr("div", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
                 return self.temp_res
+            case BinOp(left, Mod(), right):
+                reg1 = self.transform_expr(left)
+                reg2 = self.transform_expr(right)
+                self.result.append((Instr("rem", self.temp_res, reg1, reg2)))
+                self.check_free(reg2)
+            case BinOp(left, LShift(), right):
+                reg1 = self.transform_expr(left)
+                reg2 = self.transform_expr(right)
+                self.result.append((Instr("sll", self.temp_res, reg1, reg2)))
+                self.check_free(reg2)
+                return self.temp_res
+            case BinOp(left, RShift(), right):
+                reg1 = self.transform_expr(left)
+                reg2 = self.transform_expr(right)
+                self.result.append((Instr("sra", self.temp_res, reg1, reg2)))
+                self.check_free(reg2)
+                return self.temp_res
+                return self.temp_res
             case UnaryOp(USub(), rest):
                 reg = self.transform_expr(rest)
                 self.result.append((Instr("Sub", reg, Zero(), reg)))

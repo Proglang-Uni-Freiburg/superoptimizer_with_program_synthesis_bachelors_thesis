@@ -16,7 +16,6 @@ class Synthesizer:
         self.goal_func = f
         self.args = args
 
-    # ALERT THIS HAS BAD RUNTIME FOR SURE
     def match_instr(self, instrlist: List[Instr], goaldest: Reg):
         # idea: go bottom up, use new variables for results. auflösen, sozusagen! inverse of python to riscv really.
         # constants, zero and arguments stay unchanged. go thru temps, result reg
@@ -96,7 +95,7 @@ class Synthesizer:
             print("Found Solution!")
             return [], True
 
-    def cegis(self):
+    def cegis_0(self):
         gen = RiscvGen(self.args)
         example_args = [0 for x in self.args]
         arg_history = [example_args]
@@ -109,6 +108,18 @@ class Synthesizer:
                 return guess
             examples += [(example_args, self.goal_func(*example_args))]
 
+    def cegis_1(self):
+        gen = RiscvGen(self.args)
+        example_args = [0 for x in self.args]
+        min_len = 0
+        examples = [(example_args, self.goal_func(*example_args))]
+        while(True):
+            guess, min_len = gen.smart_gen(examples, min_len)
+            print(guess)
+            example_args, success = self.cegis_counter(guess)
+            if success:
+                return guess
+            examples += [(example_args, self.goal_func(*example_args))]
 
 
 
@@ -119,4 +130,6 @@ if __name__ == "__main__":
     synth.verify([Instr("addi", Reg(31), Zero(), 1), Instr("add", ReturnReg(), Reg(31), Regvar(2, 'x1'))])
     print(synth.cegis_counter([Instr("addi", Reg(31), Zero(), 2), Instr("add", ReturnReg(), Reg(31), Regvar(2, 'x1'))]))
     print("======================")
+    print("x1 + 1")
+    print("x1 = a2\n")  # TODO automate this
     print("\n" + "\n".join(repr(x) for x in synth.cegis()))

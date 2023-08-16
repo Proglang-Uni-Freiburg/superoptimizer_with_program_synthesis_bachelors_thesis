@@ -2,6 +2,7 @@ from z3 import *
 from riscv_ast import *
 from run_riscv import *
 from typing import Tuple
+import itertools
 
 
 class RiscvGen():
@@ -11,7 +12,7 @@ class RiscvGen():
     consts = []
     all_regs = [Reg(x) for x in Reg.const_regs] + [Zero(), ReturnReg()]
     arith_ops_imm: List[str] = ["addi", "subi"]
-    arith_ops: List[str] = ["add", "sub"]
+    arith_ops: List[str] = ["add", "sub", "mul", "div", "rem"]  # prefer easier operations, first
     arg_regs: List[Reg]
 
     def __init__(self, args: List[str]):
@@ -34,7 +35,6 @@ class RiscvGen():
 
     # NOTE: Maybe leave the naive solver like this. 2-line solutions are the limit
     def naive_gen(self, examples: List[Tuple[List[int], int]]) -> List[Instr]:
-        # TODO: find out if we can avoid running the solver as often!
         i = Int('i')
         count = 0
         possibilities = self.code_sketches()
@@ -59,7 +59,37 @@ class RiscvGen():
                 return self.replace_consts(p)
             self.s.pop()
 
-        raise Exception("oh no")
+        raise Exception("No posssible program was found!")
+    
+    def smart_gen(self, examples: List[Tuple[List[int], int]], min_prog_length: int) -> Tuple[List[Instr], int]:
+        i = Int('i')
+        count = 0
+        possibilities = self.smart_sketches(min_prog_length)
+        for p in possibilities:
+            self.s.push()
+            for (inputs, output) in examples:  # note that there needs to always be at least one example
+                success = True
+                # match p:
+                #     case [Instr("sub", [_, Regvar(), Regvar()]), Instr("addi", [_, _, _])]:
+                #         pass
+                try:
+                    r = run_riscv(p, {self.args[i]: inputs[i] for i in range(len(self.args))}, self.s)
+                    self.s.add(r == output)
+                except Exception as ex:  # this means the code was invalid. skip to the next one
+                    success = False
+                    count += 1
+                    break
+            if not success:
+                self.s.pop()
+                continue
+            if self.s.check() == sat:
+                print(count)
+                return self.replace_consts(p), min_prog_length
+            self.s.pop()
+
+        if min_prog_length < 10:
+            return self.smart_gen(examples, min_prog_length + 1)
+        raise Exception("No posssible program was found!")
 
     def code_sketches(self) -> List[List[Instr]]:
         possibilities = []
@@ -82,7 +112,7 @@ class RiscvGen():
         self.s.add(c2 >= self.c_min)
         self.s.add(c2 <= self.c_max)
         # all possible two-liners:
-        # NOTE: if the if-clause is removed, the list length goes from 57.288 to 627.528
+        # NOTE: if the if-clauses in the list comprehensions are removed, the list length goes from 57.288 to 627.528 (add/addi/sub/subi only)
         # reduction of the search space is definitely needed!
         for op in self.arith_ops_imm:
             for dest in self.all_regs:
@@ -93,23 +123,70 @@ class RiscvGen():
                 for arg1 in self.all_regs + self.arg_regs:
                     for arg2 in self.all_regs + self.arg_regs:
                         possibilities += [[Instr(op, dest, arg1, arg2)] + x for x in copy if x[0].args[1] == dest]
-
         return possibilities
 
+    # NOTE: avoid calling this from the start each time, i.e. only generate starting once and then just add onto it if nothing fitting is found
     # smart meaning: only try valid code. also don't generate duplicates
     def smart_sketches(self, depth: int):
         possibilities = []
-        c = Int('c' + str(depth))
-        self.consts += [c]
-        avail_regs = ([Reg.const_regs[i] for i in range((depth) + 1)] if depth <= len(Reg.const_regs) else Reg.const_regs) + \
-            [Zero(), ReturnReg()] + self.arg_regs
+        for i in range(depth + 1):
+            c = Int('c' + str(i))
+            self.consts += [c]
+        avail_regs = self.arg_regs
+        possibilities = self.helper(depth, 0, 0, [], avail_regs)
+        
+        return possibilities
 
-        option = []
+    def helper(self, iter: int, reg_iter: int, const_iter: int, temp_r: List[Instr], avail_regs: List[Reg]) -> List[List[Instr]]:
+        result = []
+        if iter == 0:
+            possibilities = []
+            for op in self.arith_ops_imm:
+                possibilities += [temp_r + [Instr(op, ReturnReg(), arg, self.consts[const_iter])] for arg in avail_regs]
+            for op in self.arith_ops:
+                possibilities += [temp_r + [Instr(op, ReturnReg(), arg1, arg2)] for arg1, arg2 in list(itertools.product(avail_regs, avail_regs))]
+            return possibilities
 
+        new_regs = avail_regs.copy()
+        new_r = temp_r.copy()
+        if reg_iter < len(Reg.const_regs):
+            new_regs.append(Reg(Reg.const_regs[reg_iter]))
+        diff = [x for x in new_regs if x not in avail_regs]
 
+        for op in self.arith_ops_imm:
+            for dest in new_regs:
+                for arg in avail_regs + [Zero()]:
+                    new_r += [Instr(op, dest, arg, self.consts[const_iter])]
+                    if dest in diff:
+                        result += self.helper(iter - 1, reg_iter + 1, const_iter + 1, new_r, new_regs)
+                    else:
+                        result += self.helper(iter - 1, reg_iter, const_iter + 1, new_r, avail_regs)
+                    new_r.pop()
+
+        for op in self.arith_ops:
+            for dest in new_regs:
+                for arg1 in avail_regs + [Zero()]:
+                    for arg2 in avail_regs + [Zero()]:
+                        new_r += [Instr(op, dest, arg1, arg2)]
+                        if dest in diff:
+                            result += self.helper(iter - 1, reg_iter + 1, const_iter, new_r, new_regs)
+                        else:
+                            result += self.helper(iter - 1, reg_iter, const_iter, new_r, avail_regs)
+                        new_r.pop()
+
+        return result
+
+    # same as smart sketches, but with dynamic programming to reduce duplication
+    def dynamic_sketches(self):
+        pass
 
 
 if __name__ == "__main__":
     gen = RiscvGen(['x', 'y'])  # NOTE: order of arguments always has to be the same in the lists
-    r = gen.naive_gen([([1, 2], 0), ([6, 6], 1)])
+    r = gen.naive_gen([([3, 2], 0), ([6, 1], 1)])
+    print(repr(r))
+
+    print(len(gen.smart_sketches(3)))  # 1.5mil possibilties...
+
+    r = gen.smart_gen([([3, 2], 0), ([6, 1], 1)], 0)
     print(repr(r))

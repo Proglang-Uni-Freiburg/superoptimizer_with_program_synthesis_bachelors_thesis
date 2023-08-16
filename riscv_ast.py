@@ -9,10 +9,16 @@ def match_op(op: str) -> Callable[[Any, Any], Any]:
             return lambda x, y: x + y
         case "sub" | "subi":
             return lambda x, y: x - y
-        case "mul" | "muli":
+        # case "slli":  # left shift (logical = arithmetic)
+        #     return lambda x, y: x << y
+        # case "srai":  # right shift (arithmetic)
+        #     return lambda x, y: x >> y
+        case "mul":  # for this case and following, immediate values are not supported
             return lambda x, y: x * y
-        case "div" | "divi":
-            return lambda x, y: x // y
+        case "div":
+            return lambda x, y: x / y if type(x) == ArithRef and type(y) == ArithRef else x // y
+        case "rem":  # remainder, signed
+            return lambda x, y: x % y
         case _:
             raise Exception("Could not match Instruction Operator")
 
