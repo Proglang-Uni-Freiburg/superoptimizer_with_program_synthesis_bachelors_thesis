@@ -182,6 +182,7 @@ class RiscvGen():
     # the same as smart_sketches, except with DP
     def dp_sketches(self, depth: int):
 
+        # TODO: rewrite this to be iterative instead of recursive
         def helper(iter: int, reg_iter: int, temp_r: List[Instr], avail_regs: List[Reg], cache: dict):
             result = []
             if (iter, reg_iter) in cache.keys():
@@ -234,6 +235,7 @@ class RiscvGen():
                                 cache[iter - 1, reg_iter] = res
                                 result += [new_instr + x for x in res]
                             new_r.pop()
+            print(cache.keys())
             return result
 
         possibilities = []
@@ -244,14 +246,73 @@ class RiscvGen():
         possibilities = helper(depth, 0, [], avail_regs, {})
         
         return possibilities
+    
+    def dp_sketches_iter(self, depth: int):
+
+        def helper(iter: int, avail_regs: List[Reg]):
+            last_cache = []
+            avail_regs_final = avail_regs.copy()
+            for i in range(min(iter, len(Reg.const_regs))):
+                avail_regs_final.append(Reg(Reg.const_regs[i]))
+
+            for op in self.arith_ops_imm:
+                last_cache += [[Instr(op, ReturnReg(), arg, self.consts[iter])] for arg in avail_regs_final]
+            for op in self.arith_ops:
+                last_cache += [[Instr(op, ReturnReg(), arg1, arg2)] for arg1, arg2 in list(itertools.product(avail_regs, avail_regs_final))]
+
+            cache = {}
+            for reg_iter in range(iter - 1, -1, -1):  # corresponds to reg_iter
+                new_regs = avail_regs.copy()
+                for i in range(min(reg_iter + 1, len(Reg.const_regs))):
+                    new_regs.append(Reg(Reg.const_regs[i]))
+                res = []
+                for op in self.arith_ops_imm:
+                    for dest in new_regs:
+                        for arg in new_regs[:-1] + [Zero()]:
+                            cache[reg_iter] = cache.get(reg_iter, []) + [Instr(op, dest, arg, self.consts[reg_iter])]
+                            
+
+                for op in self.arith_ops:
+                    for dest in new_regs:
+                        for arg1 in new_regs[:-1] + [Zero()]:
+                            for arg2 in new_regs[:-1] + [Zero()]:
+                                # eliminate redundant programs here
+                                if (op == "mul" or op == "add") and repr(arg1) > repr(arg2):
+                                    continue
+                                cache[reg_iter] += [Instr(op, dest, arg1, arg2)]
+            
+            def build_res(iter: int, maxi: int, cache: dict, last_cache: List[List[Instr]], rest):
+                res = []
+                if iter == maxi:
+                    for instr in last_cache:
+                        yield rest + [instr]
+                    return
+                for instr in cache[iter]:
+                    yield from build_res(iter + 1, maxi, cache, last_cache, rest + [instr])
+                return res
+                            
+            result = build_res(0, iter, cache, last_cache, [])
+            return result
+
+
+        possibilities = []
+        for i in range(depth + 1):
+            c = Int('c' + str(i))
+            self.consts += [c]
+        avail_regs = self.arg_regs
+        possibilities = helper(depth, avail_regs)
+        
+        return possibilities
+
 
 if __name__ == "__main__":
     gen = RiscvGen(['x', 'y'])  # NOTE: order of arguments always has to be the same in the lists
     r = gen.naive_gen([([3, 2], 0), ([6, 1], 1)])
     print(repr(r))
 
-    # print("Number of possible program sketches with length 3:", len(list(gen.smart_sketches(2))), sep='\n')  # 1.5mil possibilties...
-    print("Number of possible program sketches with length 4:", len((gen.dp_sketches(3))), sep='\n')  # 1.5mil possibilties...
+    print("Number of possible program sketches with length 3:", len(list(gen.smart_sketches(2))), sep='\n')  # 1.5mil possibilties...
+    # print("Number of possible program sketches with length 3:", len((gen.dp_sketches(2))), sep='\n')  # 1.5mil possibilties...
+    # print("Number of possible program sketches with length 3:", len(list(gen.dp_sketches_iter(2))), sep='\n')  # 1.5mil possibilties...
 
     r = gen.smart_gen([([3, 2], 0), ([6, 1], 1)], 0)
     print(repr(r))
