@@ -10,7 +10,7 @@ class Synthesizer:
     goal_func: Callable[..., int]
     args: List[str]  # list of function arguments
     to_analyze: List[str] = [repr(ReturnReg())] + [repr(Reg(x)) for x in [5, 6, 7, 28, 29, 30, 31]]
-    z3args: dict[str, ArithRef] = {}
+    z3args: dict[str, BitVecRef] = {}
 
     def __init__(self, f: Callable[..., int], args: List[str]):
         self.goal_func = f
@@ -53,11 +53,11 @@ class Synthesizer:
         s = Solver()
 
         for arg in self.args:
-            self.z3args[arg] = Int(arg)
+            self.z3args[arg] = BitVec(arg, 64)
             # s.add(self.z3args[arg] < 256)
             # s.add(self.z3args[arg] > -256)
 
-        self.z3args[repr(Zero())] = Int("Zero")
+        self.z3args[repr(Zero())] = BitVec("Zero", 64)
         s.add(self.z3args[repr(Zero())] == 0)
 
         guess.reverse()
@@ -74,11 +74,11 @@ class Synthesizer:
     def cegis_counter(self, guess:list[Instr]):
         s = Solver()
 
-        self.z3args[repr(Zero())] = Int("Zero")
+        self.z3args[repr(Zero())] = BitVec("Zero", 64)
         s.add(self.z3args[repr(Zero())] == 0)
 
         for arg in self.args:
-            self.z3args[arg] = Int(arg)
+            self.z3args[arg] = BitVec(arg, 64)
             s.add(self.z3args[arg] < 256)
             s.add(self.z3args[arg] > -256)
 

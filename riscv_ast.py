@@ -1,6 +1,6 @@
 # base class for arithmetic RISC V assembly instructions
 from typing import List, Callable, Any
-from z3 import ArithRef
+from z3 import ArithRef, BitVecRef
 
 
 def match_op(op: str) -> Callable[[Any, Any], Any]:
@@ -9,14 +9,14 @@ def match_op(op: str) -> Callable[[Any, Any], Any]:
             return lambda x, y: x + y
         case "sub" | "subi":
             return lambda x, y: x - y
-        # case "slli":  # left shift (logical = arithmetic)
-        #     return lambda x, y: x << y
-        # case "srai":  # right shift (arithmetic)
-        #     return lambda x, y: x >> y
+        case "slli":  # left shift (logical = arithmetic)
+            return lambda x, y: x << y
+        case "srai":  # right shift (arithmetic)
+            return lambda x, y: x >> y
         case "mul":  # for this case and following, immediate values are not supported
             return lambda x, y: x * y
         case "div":
-            return lambda x, y: x / y if type(x) == ArithRef and type(y) == ArithRef else x // y
+            return lambda x, y: x / y if type(x) == BitVecRef or type(y) == BitVecRef else x // y
         case "rem":  # remainder, signed
             return lambda x, y: x % y
         case _:

@@ -25,9 +25,9 @@ class RiscvGen():
         result = []
         for instr in instrs:
             match instr:
-                case Instr(op, [dest, arg1, ArithRef() as c]):
+                case Instr(op, [dest, arg1, BitVecRef() as c]):
                     c_eval = self.s.model().eval(c)
-                    result += [Instr(op, dest, arg1, int(c_eval.as_string()))]
+                    result += [Instr(op, dest, arg1, int(c_eval.as_signed_long()))]
                 case i:
                     result += [i]
         return result
@@ -35,7 +35,6 @@ class RiscvGen():
 
     # NOTE: Maybe leave the naive solver like this. 2-line solutions are the limit
     def naive_gen(self, examples: List[Tuple[List[int], int]]) -> List[Instr]:
-        i = Int('i')
         count = 0
         possibilities = self.code_sketches()
         for p in possibilities:
@@ -62,7 +61,6 @@ class RiscvGen():
         raise Exception("No posssible program was found!")
     
     def smart_gen(self, examples: List[Tuple[List[int], int]], min_prog_length: int) -> Tuple[List[Instr], int]:
-        i = Int('i')
         count = 0
         possibilities = self.smart_sketches(min_prog_length)
         for p in possibilities:
@@ -93,7 +91,7 @@ class RiscvGen():
 
     def code_sketches(self) -> List[List[Instr]]:
         possibilities = []
-        c = Int('c')
+        c = BitVec('c', 64)
         self.s.add(c >= self.c_min)
         self.s.add(c <= self.c_max)
 
@@ -108,7 +106,7 @@ class RiscvGen():
                     possibilities.append([Instr(op, ReturnReg(), arg1, arg2)])
 
         copy = possibilities.copy()
-        c2 = Int('c2')
+        c2 = BitVec('c2', 64)
         self.s.add(c2 >= self.c_min)
         self.s.add(c2 <= self.c_max)
         # all possible two-liners:
@@ -172,7 +170,7 @@ class RiscvGen():
 
         possibilities = []
         for i in range(depth + 1):
-            c = Int('c' + str(i))
+            c = BitVec('c' + str(i), 64)
             self.consts += [c]
         avail_regs = self.arg_regs
         possibilities = helper(depth, 0, [], avail_regs)
@@ -243,7 +241,7 @@ class RiscvGen():
 
         possibilities = []
         for i in range(depth + 1):
-            c = Int('c' + str(i))
+            c = BitVec('c' + str(i), 64)
             self.consts += [c]
         avail_regs = self.arg_regs
         possibilities = helper(depth, 0, [], avail_regs, {})
@@ -308,7 +306,7 @@ class RiscvGen():
 
         possibilities = []
         for i in range(depth + 1):
-            c = Int('c' + str(i))
+            c = BitVec('c' + str(i), 64)
             self.consts += [c]
         avail_regs = self.arg_regs
         possibilities = helper(depth, avail_regs)
