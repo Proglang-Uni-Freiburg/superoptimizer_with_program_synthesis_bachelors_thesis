@@ -14,8 +14,8 @@ class Compiler:
         return
 
     def compile(self, e: AST):
-        self.transform_expr(e)  # final result, equals exit code of program
-        self.result += prog_end
+        last = self.transform_expr(e)  # final result, equals exit code of program
+        self.result += [Instr("addi", ReturnReg(), last, 0)]
         return self.result
 
     def transform_const(self, val: int) -> Reg:
@@ -83,7 +83,6 @@ class Compiler:
                 reg2 = self.transform_expr(right)
                 self.result.append((Instr("sra", self.temp_res, reg1, reg2)))
                 self.check_free(reg2)
-                return self.temp_res
                 return self.temp_res
             case UnaryOp(USub(), rest):
                 reg = self.transform_expr(rest)

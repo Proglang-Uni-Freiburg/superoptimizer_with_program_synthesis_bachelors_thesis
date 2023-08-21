@@ -2,9 +2,12 @@ from ast import *
 from python_to_riscv import *
 from ast_to_func import *
 from run_riscv import *
+from synthesize import *
+from generate_riscv import *
 
 
-if __name__ == "__main__":
+
+def input_to_naive_riscv():
     in_expr = input("Please enter an arithmetic expression: ")
     in_expr_tree = parse(in_expr, mode='eval')
     in_func, in_args = expr_to_func(in_expr_tree)  # convert input to python lambda with variables as args
@@ -15,3 +18,15 @@ if __name__ == "__main__":
             res = c.compile(to_analyse)
             print('\n'.join([repr(i) for i in res]))
             print("output with all arguments set to 1, 2, ... , n:", run_riscv(res, example_dict))
+
+
+
+
+if __name__ == "__main__":
+    print("Available functions:")
+    choice = int(input("User Input to Naive RISC-V (1) \n" \
+                       "User Input to Synthesized RISC-V (2)\n"))
+    if choice == 1:
+        input_to_naive_riscv()
+    else:
+        print("Invalid choice")
