@@ -132,4 +132,7 @@ if __name__ == "__main__":
     print("======================")
     print("x1 + 1")
     print("x1 = a2\n")  # TODO automate this
-    print("\n" + "\n".join(repr(x) for x in synth.cegis()))
+    print("\n" + "\n".join(repr(x) for x in synth.cegis_1()))
+
+    synth2 = Synthesizer(lambda x1, x2: (x1 - x1) + (x2 - 3) * 2 - x2, ['x1', 'x2'])
+    print("\n" + "\n".join(repr(x) for x in synth2.cegis_1()))
