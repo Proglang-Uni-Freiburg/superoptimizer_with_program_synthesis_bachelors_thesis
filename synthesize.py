@@ -3,8 +3,6 @@ from riscv_ast import *
 from generate_riscv import *
 from typing import Callable, List
 
-# TODO: cleanup!
-
 
 class Synthesizer:
     goal_func: Callable[..., int]
@@ -16,10 +14,10 @@ class Synthesizer:
         self.goal_func = f
         self.args = args
 
+    # we cannot easily convert a list of instructions directly to z3 because registers may have different values at different points in the program
+    # instead we traverse the instruction list bottom-up, resolving registers to values when possible.
+    # a expression is returned
     def match_instr(self, instrlist: List[Instr], goaldest: Reg):
-        # idea: go bottom up, use new variables for results. auflösen, sozusagen! inverse of python to riscv really.
-        # constants, zero and arguments stay unchanged. go thru temps, result reg
-        # perhaps change rule about arguments later on, as of now don't generate anything that overwrites arguments
         to_var = lambda x: self.z3args[py_name(x)]  # helper
 
         for instr in instrlist:
@@ -49,7 +47,8 @@ class Synthesizer:
                 case _:
                     raise Exception("Not a valid RISC-V instruction")
 
-    def verify(self, guess: list[Instr]):  # TODO: currently only works with valid programs. add try-except
+    # verifies if guess matches goal function or not. Prints result
+    def verify(self, guess: list[Instr]):
         s = Solver()
 
         for arg in self.args:
@@ -62,16 +61,23 @@ class Synthesizer:
 
         guess.reverse()
 
-        unrolled_expr = self.match_instr(guess, ReturnReg())
-        s.add(unrolled_expr == self.goal_func(*[self.z3args[x] for x in self.args]))
+        try:
+            unrolled_expr = self.match_instr(guess, ReturnReg())
+            s.add(unrolled_expr == self.goal_func(*[self.z3args[x] for x in self.args]))
+        except Exception as e:
+            print("Tried to verify a program that was not valid")
+            return False
 
         if s.check() == sat:
-            print("success!")
+            print("Instrction sequence matches goal function")
             print(s.model())
+            return True
         else:
-            print("nope :(")
+            print("Instruction sequence did not match goal function")
+            return False
 
-    def cegis_counter(self, guess:list[Instr]):
+    # provides a counter example if the guess wasn't correct, or just returns true if the guess matched the specification
+    def cegis_counter(self, guess:list[Instr]) -> Tuple[List[Instr], bool]:
         s = Solver()
 
         self.z3args[repr(Zero())] = BitVec("Zero", 64)
@@ -81,7 +87,6 @@ class Synthesizer:
             self.z3args[arg] = BitVec(arg, 64)
             s.add(self.z3args[arg] < 256)
             s.add(self.z3args[arg] > -256)
-
 
         guess.reverse()
 
@@ -95,10 +100,10 @@ class Synthesizer:
             print("Found Solution!")
             return [], True
 
+    # uses naive generator for guesses
     def cegis_0(self):
         gen = RiscvGen(self.args)
         example_args = [0 for x in self.args]
-        arg_history = [example_args]
         examples = [(example_args, self.goal_func(*example_args))]
         while(True):
             guess = gen.naive_gen(examples)
@@ -108,6 +113,7 @@ class Synthesizer:
                 return guess
             examples += [(example_args, self.goal_func(*example_args))]
 
+    # uses generator with pruned search space
     def cegis_1(self):
         gen = RiscvGen(self.args)
         example_args = [0 for x in self.args]

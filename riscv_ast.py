@@ -69,7 +69,8 @@ def py_name(r: Reg) -> str:
 # Representation of instructions with a variable number of arguments. Only represents instructions with a destination
 class Instr:
     __match_args__ = ("instr", "args")
-
+    
+    arith_ops = ['addi', 'subi', 'slli', 'srai', 'add', 'sub', 'mul', 'div', 'rem']
     instr: str
     # args: Tuple[Reg | int]  # register or immediate
 
