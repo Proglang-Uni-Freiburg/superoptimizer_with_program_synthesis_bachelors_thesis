@@ -1,5 +1,5 @@
 from z3 import *
-from riscv_ast import *
+from riscv_dsl import *
 from run_riscv import *
 from typing import Tuple
 import itertools
@@ -17,6 +17,7 @@ class RiscvGen():
     arg_regs: List[Reg]
     cache: dict[Tuple[int, int], List[List[Instr]]]
     cache_p: dict[int, List[Tuple[Instr, bool]]]
+    sketch_gen: Iterable  # for higher depths, we don't want to restart the sketch generator and instead save it between cegis turns
 
     def __init__(self, args: List[str]):
         self.args = args
@@ -344,9 +345,14 @@ if __name__ == "__main__":
     r = gen.naive_gen([([3, 2], 0), ([6, 1], 1)])
     print(repr(r))
 
-    # print("Number of possible program sketches with length 3:", len(list(gen.smart_sketches(2))), sep='\n')  # 1.5mil possibilties...
-    # print("Number of possible program sketches with length 3:", len((gen.dp_sketches(2))), sep='\n')  # 1.5mil possibilties...
-    print("Number of possible program sketches with length 3:", len(list(gen.dp_sketches_parallel(2))), sep='\n')  # 1.5mil possibilties...
+    # print("Number of possible program sketches with length 3:", len(list(gen.smart_sketches(2))), sep='\n')
+    # print("Number of possible program sketches with length 3:", len((gen.dp_sketches(2))), sep='\n')
+    print("Number of possible program sketches with length 3:", len(list(gen.dp_sketches_parallel(2))), sep='\n')  # 1.014.048 possibilties
+    count = 0
+    for x in gen.dp_sketches_parallel(3):  # ~389 million possibilties
+        count += 1
+
+    print(count)
 
     r = gen.smart_gen([([3, 2], 0), ([6, 1], 1)], 0)
     print(repr(r))

@@ -1,9 +1,9 @@
 from ast import *
-from python_ast_to_riscv_ast import *
+from python_ast_to_dsl import *
 from python_ast_to_func import *
 from run_riscv import *
-from synthesize import *
-from generate_riscv import *
+from cegis_verify import *
+from synthesis import *
 
 
 

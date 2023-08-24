@@ -1,4 +1,4 @@
-from riscv_ast import *
+from riscv_dsl import *
 import sys
 
 __all__ = ["ast_to_output", "input_to_ast"]

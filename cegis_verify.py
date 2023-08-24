@@ -1,6 +1,6 @@
 from z3 import *
-from riscv_ast import *
-from generate_riscv import *
+from riscv_dsl import *
+from synthesis import *
 from typing import Callable, List
 
 
