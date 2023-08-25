@@ -2,6 +2,10 @@ from riscv_dsl import *
 from ast import *
 from typing import Callable, Tuple, List
 
+def add_return(instrs: List[Instr]) -> List[Instr]:
+    last_dest = instrs[-1].args[0]
+    return instrs + [Instr('addi', ReturnReg(), last_dest, 0)]
+
 def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
     match arg1:
         case str() as s:
@@ -13,7 +17,7 @@ def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
         case str() as s:
             rightval = Name(id=s, ctx=Load())
         case int(i):
-            rightval = Constant(value=1)
+            rightval = Constant(value=i)
         case BinOp() as x:
             rightval = x
     
@@ -35,9 +39,10 @@ def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
 
 # converts a instruction sequence into a function. 
 # variables occuring in the function are returned in the list (in order of appearance)
-def dsl_to_func(instrlist: List[Instr]) -> Tuple[Callable[[List[int]], int], list[str]]:
+def to_func(instrlist: List[Instr]) -> Tuple[Callable[[List[int]], int], list[str]]:
     assigned: dict[str, BinOp] = {}
     vars: list[str] = []
+    instrlist = add_return(instrlist)  # added as safety and for if instrlist is only a snippet
     for instr in instrlist:
         match instr:
             case Instr(op, (dest, Reg() as arg1, int(imm))):
@@ -73,11 +78,12 @@ def dsl_to_func(instrlist: List[Instr]) -> Tuple[Callable[[List[int]], int], lis
                                                  kw_defaults=[],
                                                  defaults=[]),
                                   body=expr_body))
+    print(dump(func))
     return eval(unparse(func)), vars
 
 
 if __name__ == "__main__":
-    func, vars = dsl_to_func([Instr('slli', Regvar(3, 'x'), Regvar(3, 'x'), 1),
+    func, vars = to_func([Instr('slli', Regvar(3, 'x'), Regvar(3, 'x'), 1),
                               Instr('add', ReturnReg(), Regvar(3, 'x'), Regvar(4, 'y'))])
     print(func(2, 4))
 
