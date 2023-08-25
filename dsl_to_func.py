@@ -1,30 +1,83 @@
 from riscv_dsl import *
+from ast import *
+from typing import Callable, Tuple, List
 
+def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
+    match arg1:
+        case str() as s:
+            leftval = Name(id=s, ctx=Load())
+        case BinOp() as x:
+            leftval = x
+    
+    match arg2:
+        case str() as s:
+            rightval = Name(id=s, ctx=Load())
+        case int(i):
+            rightval = Constant(value=1)
+        case BinOp() as x:
+            rightval = x
+    
+    match operator:
+        case "add" | "addi":
+            opval = Add()
+        case "sub" | "subi":
+            opval = Sub()
+        case "mul":
+            opval = Mult()
+        case "div":
+            opval = Div()
+        case "slli":
+            opval = LShift()
+        case "srai":
+            opval = RShift()
 
-def match_instr(self, instrlist: List[Instr], goaldest: Reg):
+    return BinOp(left=leftval, op=opval, right=rightval)
+
+# converts a instruction sequence into a function. 
+# variables occuring in the function are returned in the list (in order of appearance)
+def dsl_to_func(instrlist: List[Instr]) -> Tuple[Callable[[List[int]], int], list[str]]:
+    assigned: dict[str, BinOp] = {}
+    vars: list[str] = []
     for instr in instrlist:
         match instr:
-            case Instr(op, (dest, Reg() as arg, int(imm))) if repr(dest) == repr(goaldest):
-                if repr(arg) in self.to_analyze:
-                    left = self.match_instr(instrlist[1:], arg)
+            case Instr(op, (dest, Reg() as arg1, int(imm))):
+                if repr(arg1) in assigned.keys():
+                    assigned[repr(dest)] = (_to_ast(op, assigned[repr(arg1)], imm))
                 else:
-                    left = to_var(arg)
-                return match_op(op)(left, imm)
+                    vars += [py_name(arg1)] if py_name(arg1) not in vars else []
+                    assigned[repr(dest)] = (_to_ast(op, py_name(arg1), imm))
+                continue
 
-            case Instr(op, (dest, Reg() as arg1, Reg() as arg2)) if repr(dest) == repr(goaldest):
-                if repr(arg1) in self.to_analyze:
-                    left = self.match_instr(instrlist[1:], arg1)
+            case Instr(op, (dest, Reg() as arg1, Reg() as arg2)):
+                left, right = 0, 0
+                if repr(arg1) not in assigned.keys():
+                    vars += [py_name(arg1)] if py_name(arg1) not in vars else []
+                    left = py_name(arg1)
                 else:
-                    left = to_var(arg1)
-
-                if repr(arg2) in self.to_analyze:
-                    right = self.match_instr(instrlist[1:], arg2)
+                    left = assigned[repr(arg1)]
+                if repr(arg2) not in assigned.keys():
+                    vars += [py_name(arg2)] if py_name(arg2) not in vars else []
+                    right = py_name(arg2)
                 else:
-                    right = to_var(arg2)
-                return match_op(op)(left, right)
-
-            case Instr(_):
-                return self.match_instr(instrlist[1:], goaldest)
+                    right = assigned[repr(arg2)]
+                assigned[repr(dest)] = _to_ast(op, left, right)
+                continue
 
             case _:
-                raise Exception("Not a valid RISC-V instruction")
+                continue
+
+    expr_body = assigned[repr(ReturnReg())]
+    func = Expression(body=Lambda(args=arguments(posonlyargs=[],
+                                                 args=[arg(arg=id) for id in vars],
+                                                 kwonlyargs=[],
+                                                 kw_defaults=[],
+                                                 defaults=[]),
+                                  body=expr_body))
+    return eval(unparse(func)), vars
+
+
+if __name__ == "__main__":
+    func, vars = dsl_to_func([Instr('slli', Regvar(3, 'x'), Regvar(3, 'x'), 1),
+                              Instr('add', ReturnReg(), Regvar(3, 'x'), Regvar(4, 'y'))])
+    print(func(2, 4))
+
