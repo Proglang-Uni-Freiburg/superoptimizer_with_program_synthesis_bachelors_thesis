@@ -8,12 +8,16 @@ def add_return(instrs: List[Instr]) -> List[Instr]:
 
 def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
     match arg1:
+        case 'x0':
+            leftval = Constant(value=0)
         case str() as s:
             leftval = Name(id=s, ctx=Load())
         case BinOp() as x:
             leftval = x
     
     match arg2:
+        case 'x0':
+            rightval = Constant(value=0)
         case str() as s:
             rightval = Name(id=s, ctx=Load())
         case int(i):
@@ -29,7 +33,7 @@ def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
         case "mul":
             opval = Mult()
         case "div":
-            opval = Div()
+            opval = FloorDiv()
         case "slli":
             opval = LShift()
         case "srai":
@@ -49,19 +53,22 @@ def to_func(instrlist: List[Instr]) -> Tuple[Callable[[List[int]], int], list[st
                 if repr(arg1) in assigned.keys():
                     assigned[repr(dest)] = (_to_ast(op, assigned[repr(arg1)], imm))
                 else:
-                    vars += [py_name(arg1)] if py_name(arg1) not in vars else []
+                    if type(arg1) is Regvar and arg1.num in Regvar.var_regs:
+                        vars += [py_name(arg1)] if py_name(arg1) not in vars else []
                     assigned[repr(dest)] = (_to_ast(op, py_name(arg1), imm))
                 continue
 
             case Instr(op, (dest, Reg() as arg1, Reg() as arg2)):
                 left, right = 0, 0
                 if repr(arg1) not in assigned.keys():
-                    vars += [py_name(arg1)] if py_name(arg1) not in vars else []
+                    if type(arg1) is Regvar and arg1.num in Regvar.var_regs:
+                        vars += [py_name(arg1)] if py_name(arg1) not in vars else []
                     left = py_name(arg1)
                 else:
                     left = assigned[repr(arg1)]
                 if repr(arg2) not in assigned.keys():
-                    vars += [py_name(arg2)] if py_name(arg2) not in vars else []
+                    if type(arg2) is Regvar and arg2.num in Regvar.var_regs:
+                        vars += [py_name(arg2)] if py_name(arg2) not in vars else []
                     right = py_name(arg2)
                 else:
                     right = assigned[repr(arg2)]
@@ -78,7 +85,6 @@ def to_func(instrlist: List[Instr]) -> Tuple[Callable[[List[int]], int], list[st
                                                  kw_defaults=[],
                                                  defaults=[]),
                                   body=expr_body))
-    print(dump(func))
     return eval(unparse(func)), vars
 
 

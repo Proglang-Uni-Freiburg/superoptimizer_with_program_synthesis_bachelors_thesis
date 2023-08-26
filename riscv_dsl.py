@@ -16,7 +16,7 @@ def match_op(op: str) -> Callable[[Any, Any], Any]:
         case "mul":  # for this case and following, immediate values are not supported
             return lambda x, y: x * y
         case "div":
-            return lambda x, y: x / y if type(x) == BitVecRef or type(y) == BitVecRef else x // y
+            return lambda x, y: x // y
         case "rem":  # remainder, signed
             return lambda x, y: x % y
         case _:

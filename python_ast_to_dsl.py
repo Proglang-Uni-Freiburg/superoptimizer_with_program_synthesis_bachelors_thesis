@@ -18,6 +18,10 @@ class Compiler:
         self.result += [Instr("addi", ReturnReg(), last, 0)]
         return self.result
 
+    def compile_input(self, e:str):
+        in_ast = parse(e, mode='eval')
+        return self.compile(in_ast.body)
+
     def _transform_const(self, val: int) -> Reg:
         if len(self.avail_const) > 1:
             reg = self.avail_const.pop()
@@ -61,7 +65,7 @@ class Compiler:
                 self.result.append((Instr("mul", self.temp_res, reg1, reg2)))
                 self._check_free(reg2)
                 return self.temp_res
-            case BinOp(left, Div(), right):
+            case BinOp(left, Div(), right) | BinOp(left, FloorDiv(), right):
                 reg1 = self._transform_expr(left)
                 reg2 = self._transform_expr(right)
                 self.result.append((Instr("div", self.temp_res, reg1, reg2)))
@@ -95,3 +99,4 @@ class Compiler:
                 return self._transform_const(val)
             case _:
                 raise Exception("could not parse " + dump(e))
+

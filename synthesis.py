@@ -3,7 +3,6 @@ from riscv_dsl import *
 from run_riscv import *
 from typing import Tuple
 import itertools
-import threading
 
 
 class RiscvGen():
@@ -17,7 +16,8 @@ class RiscvGen():
     arg_regs: List[Reg]
     cache: dict[Tuple[int, int], List[List[Instr]]]
     cache_p: dict[int, List[Tuple[Instr, bool]]]
-    sketch_gen: Iterable  # for higher depths, we don't want to restart the sketch generator and instead save it between cegis turns
+    sketch_gen: None | Iterable  # for higher depths, we don't want to restart the sketch generator and instead save it between cegis turns
+    last_min: int
 
     def __init__(self, args: List[str]):
         self.args = args
@@ -27,6 +27,8 @@ class RiscvGen():
         self.consts = []
         self.cache = {}
         self.cache_p = {}
+        self.sketch_gen = None
+        self.last_min = -1
 
 
     def replace_consts(self, instrs: List[Instr]):
@@ -112,14 +114,14 @@ class RiscvGen():
                     self.s.add(r == output)
                 except Exception as ex:  # this means the code was invalid. skip to the next one
                     success = False
-                    count += 1
                     break
             if not success:
                 self.s.pop()
                 continue
             if self.s.check() == sat:
-                print("Number of invalid programs checked:", count)
+                # print("Number of invalid programs checked:", count)
                 return self.replace_consts(p), min_prog_length
+            count += 1
             self.s.pop()
 
         if min_prog_length < 10:
@@ -180,6 +182,36 @@ class RiscvGen():
         possibilities = helper(depth, 0, [], avail_regs)
         
         return possibilities
+
+    def dp_gen(self, examples: List[Tuple[List[int], int]], min_prog_length: int) -> Tuple[List[Instr], int]:
+        count = 0
+        if self.sketch_gen is None or self.last_min != min_prog_length:
+            self.sketch_gen = self.dp_sketches_yield(min_prog_length)
+        possibilities = self.sketch_gen
+        self.last_min = min_prog_length
+
+        for p in possibilities:
+            self.s.push()
+            for (inputs, output) in examples:  # note that there needs to always be at least one example
+                success = True
+                try:
+                    r = run_riscv(p, {self.args[i]: inputs[i] for i in range(len(self.args))}, self.s)
+                    self.s.add(r == output)
+                except Exception as ex:  # this means the code was invalid. skip to the next one
+                    success = False
+                    count += 1
+                    break
+            if not success:
+                self.s.pop()
+                continue
+            if self.s.check() == sat:
+                # print("Number of invalid programs checked:", count)  # for debugging
+                return self.replace_consts(p), min_prog_length
+            self.s.pop()
+
+        if min_prog_length < 10:
+            return self.dp_gen(examples, min_prog_length + 1)
+        raise Exception("No posssible program was found!")
 
     # the same as smart_sketches, except with DP
     def dp_sketches(self, depth: int):
@@ -254,7 +286,7 @@ class RiscvGen():
     
     # iterative memoization itself was not an improvement to the recursive dp version. However, this version was adapted to use utilize
     # multithreading as well as yield
-    def dp_sketches_parallel(self, depth: int):
+    def dp_sketches_yield(self, depth: int):
 
         def helper(iter: int, avail_regs: List[Reg]):
 
@@ -291,6 +323,9 @@ class RiscvGen():
                                     res = [(instr, False)]
                                 self.cache_p[reg_iter] += res
 
+            for i in range(iter):
+                compute_iteration(i)
+
             # inital setup: add all possibilities for instrs of length 1 because they don't follow the same pattern
             end_list = {}
             for reg_iter in range(0, iter + 1):
@@ -307,15 +342,6 @@ class RiscvGen():
                     else:
                         end_list[reg_iter] += [Instr(op, ReturnReg(), arg1, arg2) for arg1, arg2 in list(itertools.product(new_regs, new_regs))]
 
-            threadlist = []
-            for reg_iter in range(0, iter):
-                compute_iteration(reg_iter)
-                # threadlist.append(threading.Thread(target=compute_iteration, args=(reg_iter)))
-                # for th in threadlist:
-                #     th.start()
-                # for th in threadlist:
-                #     th.join()
-            
             def build_res(iter: int, reg_iter: int, maxi: int, rest):
                 if iter == maxi:
                     for instr in end_list[reg_iter]:
@@ -346,10 +372,10 @@ if __name__ == "__main__":
     print(repr(r))
 
     # print("Number of possible program sketches with length 3:", len(list(gen.smart_sketches(2))), sep='\n')
-    # print("Number of possible program sketches with length 3:", len((gen.dp_sketches(2))), sep='\n')
-    print("Number of possible program sketches with length 3:", len(list(gen.dp_sketches_parallel(2))), sep='\n')  # 1.014.048 possibilties
+    print("Number of possible program sketches with length 3:", len((gen.dp_sketches(2))), sep='\n')
+    print("Number of possible program sketches with length 3:", len(list(gen.dp_sketches_yield(2))), sep='\n')  # 1.014.048 possibilties
     count = 0
-    for x in gen.dp_sketches_parallel(3):  # ~389 million possibilties
+    for x in gen.dp_sketches_yield(3):  # ~389 million possibilties
         count += 1
 
     print(count)
