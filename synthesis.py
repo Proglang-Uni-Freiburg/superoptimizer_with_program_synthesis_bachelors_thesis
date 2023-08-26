@@ -69,6 +69,7 @@ class RiscvGen():
 
     def code_sketches(self) -> List[List[Instr]]:
         possibilities = []
+        self.s = Solver()
         c = BitVec('c', 64)
         self.s.add(c >= self.c_min)
         self.s.add(c <= self.c_max)
@@ -175,6 +176,8 @@ class RiscvGen():
                             new_r.pop()
 
         possibilities = []
+        self.s = Solver()  # reset solver if it was used in different synthesis before
+        self.consts = []
         for i in range(depth + 1):
             c = BitVec('c' + str(i), 64)
             self.consts += [c]
@@ -195,6 +198,9 @@ class RiscvGen():
             for (inputs, output) in examples:  # note that there needs to always be at least one example
                 success = True
                 try:
+                    match p:
+                        case [Instr("addi", _), Instr('srai', _)]:
+                            pass
                     r = run_riscv(p, {self.args[i]: inputs[i] for i in range(len(self.args))}, self.s)
                     self.s.add(r == output)
                 except Exception as ex:  # this means the code was invalid. skip to the next one
@@ -206,7 +212,9 @@ class RiscvGen():
                 continue
             if self.s.check() == sat:
                 # print("Number of invalid programs checked:", count)  # for debugging
-                return self.replace_consts(p), min_prog_length
+                correct_p = self.replace_consts(p)
+                self.s.pop()
+                return correct_p, min_prog_length
             self.s.pop()
 
         if min_prog_length < 10:
@@ -276,6 +284,8 @@ class RiscvGen():
             return result
 
         possibilities = []
+        self.s = Solver()
+        self.consts = []
         for i in range(depth + 1):
             c = BitVec('c' + str(i), 64)
             self.consts += [c]
@@ -299,7 +309,7 @@ class RiscvGen():
                 for op in self.arith_ops_imm:
                     for dest in new_regs:
                         for arg in new_regs[:-1] + [Zero()]:
-                            instr = Instr(op, dest, arg, self.consts[reg_iter])
+                            instr = Instr(op, dest, arg, self.consts[reg_iter + 1])
                             if dest == new_regs[-1]:
                                 res = [(instr, True)]
                             else:
@@ -357,6 +367,8 @@ class RiscvGen():
             return result
 
         possibilities = []
+        self.s = Solver()
+        self.consts = []
         for i in range(depth + 1):
             c = BitVec('c' + str(i), 64)
             self.consts += [c]

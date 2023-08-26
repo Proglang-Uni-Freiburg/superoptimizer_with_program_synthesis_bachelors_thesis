@@ -19,13 +19,27 @@ class Verifier:
         self.to_analyze = [repr(ReturnReg())] + [repr(Reg(x)) for x in [5, 6, 7, 28, 29, 30, 31]]
 
         # floordiv is not implemented for z3 arguments. Regular div converts to ints automatically, though
-        BitVecRef.__floordiv__ = lambda self, other: BitVecRef.__div__(self, other)
+        BitVecRef.__floordiv__ = lambda self, other: If(And(self * other < 0, self % other != 0),
+                                                        BitVecRef.__div__(self, other) - 1,
+                                                        BitVecRef.__div__(self, other))
+        BitVecRef.__rfloordiv__ = lambda self, other: If(And(self * other < 0, self % other != 0),
+                                                        BitVecRef.__div__(self, other) - 1,
+                                                        BitVecRef.__div__(self, other))
+
+        # for avoiding overflow
+        BitVecRef.__add__ = lambda self, other: And(BVAddNoOverflow(self, other, True), BVAddNoUnderflow(self, other))
+        BitVecRef.__ladd__ = lambda self, other: And(BVAddNoOverflow(self, other, True), BVAddNoUnderflow(self, other))
+        BitVecRef.__sub__ = lambda self, other: And(BVSubNoOverflow(self, other), BVSubNoUnderflow(self, other, True))
+        BitVecRef.__lsub__ = lambda self, other: And(BVSubNoOverflow(self, other), BVSubNoUnderflow(self, other, True))
+        BitVecRef.__mul__ = lambda self, other: And(BVMulNoOverflow(self, other, True), BVMulNoUnderflow(self, other))
+        BitVecRef.__lmul__ = lambda self, other: And(BVMulNoOverflow(self, other, True), BVMulNoUnderflow(self, other))
+
+
+
 
     # we cannot easily convert a list of instructions directly to z3 because registers may have different values at different points in the program
     # instead we traverse the instruction list bottom-up, resolving registers to values when possible.
     # a expression is returned
-    # TODO: This needs to be rewritten! It does not currently work correctly.
-    # instead do this: don't go bottom up. Just save results.
     def match_instr(self, instrlist: List[Instr], goaldest: Reg):
         to_var = lambda x: self.z3args[py_name(x)]  # helper
 
@@ -183,3 +197,9 @@ if __name__ == "__main__":
     c = Compiler()
     synth3 = DirectCegis(c.compile_input('(x + 2) / 4'))
     print("\n".join(repr(x) for x in synth3.cegis_2()))
+
+    x = BitVec('x', 64)
+    s = Solver()
+    s.add(x + 2 >> 2 != (x + 2) // 4)
+    s.check()
+    print(s.model().eval(x).as_signed_long())

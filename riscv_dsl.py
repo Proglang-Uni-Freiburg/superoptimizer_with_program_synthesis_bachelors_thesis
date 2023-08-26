@@ -1,6 +1,6 @@
 # base class for arithmetic RISC V assembly instructions
 from typing import List, Callable, Any
-from z3 import BitVecRef
+from z3 import BitVecRef, BV2Int
 
 
 def match_op(op: str) -> Callable[[Any, Any], Any]:
