@@ -6,8 +6,8 @@ import itertools
 
 
 class RiscvGen():
-    c_min = -10
-    c_max = 10
+    c_min = -256
+    c_max = 255
     max_depth = 10
     consts: List[BitVecRef]
     all_regs: List[Reg]
@@ -18,6 +18,7 @@ class RiscvGen():
     cache_p: dict[int, List[Tuple[Instr, bool]]]
     sketch_gen: None | Iterable  # for higher depths, we don't want to restart the sketch generator and instead save it between cegis turns
     last_min: int
+    s: Solver
 
     def __init__(self, args: List[str]):
         self.args = args
@@ -180,6 +181,8 @@ class RiscvGen():
         self.consts = []
         for i in range(depth + 1):
             c = BitVec('c' + str(i), 64)
+            self.s.add(c >= self.c_min)
+            self.s.add(c <= self.c_max)
             self.consts += [c]
         avail_regs = self.arg_regs
         possibilities = helper(depth, 0, [], avail_regs)
@@ -288,6 +291,8 @@ class RiscvGen():
         self.consts = []
         for i in range(depth + 1):
             c = BitVec('c' + str(i), 64)
+            self.s.add(c >= self.c_min)
+            self.s.add(c <= self.c_max)
             self.consts += [c]
         avail_regs = self.arg_regs
         possibilities = helper(depth, 0, [], avail_regs)
@@ -371,6 +376,8 @@ class RiscvGen():
         self.consts = []
         for i in range(depth + 1):
             c = BitVec('c' + str(i), 64)
+            self.s.add(c >= self.c_min)
+            self.s.add(c <= self.c_max)
             self.consts += [c]
         avail_regs = self.arg_regs
         possibilities = helper(depth, avail_regs)

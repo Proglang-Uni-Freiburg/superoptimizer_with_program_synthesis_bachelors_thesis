@@ -3,7 +3,7 @@ from typing import List
 from z3 import *
 
 # optional argument for z3 solver, because rule to avoid division/modulo by zero might need to be added
-def run_riscv(riscv: List[Instr], args: dict[str, int], s = Solver()) -> int:
+def run_riscv(riscv: List[Instr], args: dict[str, int | BitVecRef], s = Solver()) -> int | BitVecRef:
     r = 0
     regs = args.copy()
     regs[py_name(Zero())] = 0
@@ -17,6 +17,8 @@ def run_riscv(riscv: List[Instr], args: dict[str, int], s = Solver()) -> int:
                 regs[py_name(dest)] = match_op(op)(left, right)
             case Instr(op, (Reg() as dest, Reg() as arg, imm)):
                 left = regs[py_name(arg)]
+                if op == 'slli' or op == 'srai':
+                    s.add(imm > 0)
                 regs[py_name(dest)] = match_op(op)(left, imm)
             case _:  # ignore invalid code
                 continue

@@ -4,6 +4,7 @@ from python_ast_to_func import *
 from run_riscv import *
 from cegis_verify import *
 from synthesis import *
+from dsl_input_output import *
 
 
 
@@ -14,7 +15,9 @@ def input_to_naive_riscv():
     example_dict = {in_args[x]: (x + 1) for x in range(len(in_args))}  # for testing purposes
     c = Compiler()
     res = c.compile_input(in_expr)
-    print('\n'.join([repr(i) for i in res]))
+    ast_to_output(res, f_name="out.s")
+    ast_to_output(res)
+    # print('\n'.join([repr(i) for i in res]))
     print("output with all arguments set to 1, 2, ... , n:", run_riscv(res, example_dict))
 
 

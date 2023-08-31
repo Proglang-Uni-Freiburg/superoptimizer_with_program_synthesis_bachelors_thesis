@@ -4,13 +4,14 @@ from typing import List
 
 
 class Compiler:
-    temp_res: Reg = ReturnReg()
+    temp_res: Reg = TempRes()
     avail_const: List[Reg] = [Reg(x) for x in [5, 6, 7, 28, 29, 30, 31]]
     avail_var: List[int] = list(range(7, 1, -1))
     used_var: dict[str, Reg] = {}
-    result: List[Instr] = prog_start
+    result: List[Instr]
 
     def __init__(self):
+        self.result = []
         return
 
     def compile(self, e: AST):

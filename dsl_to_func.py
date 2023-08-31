@@ -6,13 +6,13 @@ def add_return(instrs: List[Instr]) -> List[Instr]:
     last_dest = instrs[-1].args[0]
     return instrs + [Instr('addi', ReturnReg(), last_dest, 0)]
 
-def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
+def _to_ast(operator: str, arg1: str | BinOp | Call, arg2: str | int | BinOp | Call) -> BinOp | Call:
     match arg1:
         case 'x0':
             leftval = Constant(value=0)
         case str() as s:
             leftval = Name(id=s, ctx=Load())
-        case BinOp() as x:
+        case _ as x:
             leftval = x
     
     match arg2:
@@ -22,7 +22,7 @@ def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
             rightval = Name(id=s, ctx=Load())
         case int(i):
             rightval = Constant(value=i)
-        case BinOp() as x:
+        case _ as x:
             rightval = x
     
     match operator:
@@ -33,7 +33,7 @@ def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
         case "mul":
             opval = Mult()
         case "div":
-            opval = FloorDiv()
+            return Call(func=Name(id='pydiv', ctx=Load()), args=[leftval, rightval], keywords=[])
         case "slli":
             opval = LShift()
         case "srai":
@@ -44,7 +44,7 @@ def _to_ast(operator: str, arg1: str | BinOp, arg2: str | int | BinOp) -> BinOp:
 # converts a instruction sequence into a function. 
 # variables occuring in the function are returned in the list (in order of appearance)
 def to_func(instrlist: List[Instr]) -> Tuple[Callable[[List[int]], int], list[str]]:
-    assigned: dict[str, BinOp] = {}
+    assigned: dict[str, BinOp | Call] = {}
     vars: list[str] = []
     instrlist = add_return(instrlist)  # added as safety and for if instrlist is only a snippet
     for instr in instrlist:
@@ -53,22 +53,19 @@ def to_func(instrlist: List[Instr]) -> Tuple[Callable[[List[int]], int], list[st
                 if repr(arg1) in assigned.keys():
                     assigned[repr(dest)] = (_to_ast(op, assigned[repr(arg1)], imm))
                 else:
-                    if type(arg1) is Regvar and arg1.num in Regvar.var_regs:
-                        vars += [py_name(arg1)] if py_name(arg1) not in vars else []
+                    vars += [] if py_name(arg1) in vars or arg1 == Zero() else [py_name(arg1)]
                     assigned[repr(dest)] = (_to_ast(op, py_name(arg1), imm))
                 continue
 
             case Instr(op, (dest, Reg() as arg1, Reg() as arg2)):
                 left, right = 0, 0
                 if repr(arg1) not in assigned.keys():
-                    if type(arg1) is Regvar and arg1.num in Regvar.var_regs:
-                        vars += [py_name(arg1)] if py_name(arg1) not in vars else []
+                    vars += [] if py_name(arg1) in vars or arg1 == Zero() else [py_name(arg1)]
                     left = py_name(arg1)
                 else:
                     left = assigned[repr(arg1)]
                 if repr(arg2) not in assigned.keys():
-                    if type(arg2) is Regvar and arg2.num in Regvar.var_regs:
-                        vars += [py_name(arg2)] if py_name(arg2) not in vars else []
+                    vars += [] if py_name(arg2) in vars or arg2 == Zero() else [py_name(arg2)]
                     right = py_name(arg2)
                 else:
                     right = assigned[repr(arg2)]

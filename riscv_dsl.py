@@ -3,6 +3,8 @@ from typing import List, Callable, Any
 from z3 import BitVecRef, BV2Int
 
 
+pydiv =  lambda x, y: int(x / y) if type(x) is int and type(y) is int else x / y
+
 def match_op(op: str) -> Callable[[Any, Any], Any]:
     match op:
         case "add" | "addi":
@@ -16,7 +18,7 @@ def match_op(op: str) -> Callable[[Any, Any], Any]:
         case "mul":  # for this case and following, immediate values are not supported
             return lambda x, y: x * y
         case "div":
-            return lambda x, y: x // y
+            return lambda x, y: pydiv(x, y)
         case "rem":  # remainder, signed
             return lambda x, y: x % y
         case _:
@@ -32,8 +34,13 @@ class Reg:
         self.num = num
         assert num in self.const_regs
 
+    # the same as corresponding representation in actual risc-v assembly
     def __repr__(self):
         return "x" + str(self.num)
+
+    # define equality on repr
+    def __eq__(self, other):
+        return repr(self) == repr(other)
 
 
 class Regvar(Reg):
@@ -61,6 +68,9 @@ class ReturnReg(Regvar):
     def __init__(self):
         self.num = 0
 
+class TempRes(Regvar):
+    def __init__(self):
+        self.num = 1
 
 def py_name(r: Reg) -> str:
     return r.py_name() if type(r) == Regvar else repr(r)
@@ -68,25 +78,40 @@ def py_name(r: Reg) -> str:
 
 # Representation of instructions with a variable number of arguments. Only represents instructions with a destination
 class Instr:
-    __match_args__ = ("instr", "args")
+    __match_args__ = ("op", "args")
     
     arith_ops = ['addi', 'subi', 'slli', 'srai', 'add', 'sub', 'mul', 'div', 'rem']
-    instr: str
+    op: str
     # args: Tuple[Reg | int]  # register or immediate
 
-    def __init__(self, instr: str, *args: Reg | int | BitVecRef):
-        self.instr = instr.lower()
+    def __init__(self, op: str, *args: Reg | int | BitVecRef):
+        self.op = op.lower()
         self.args = args
 
     def __repr__(self):
-        return self.instr + " " + ", ".join(repr(a) for a in self.args)
+        return self.op + " " + ", ".join(repr(a) for a in self.args)
+
+    # define equality on components instead of object identity
+    def __eq__(self, other):
+        if type(other) is Instr:
+            if self.op == other.op and len(self.args) == len(other.args):
+                return (all(self.args[i] == other.args[i] for i in range(len(self.args))))
+        else:
+            return False
 
 
 class Regassign(Instr):
     def __init__(self, reg: Reg, num: int):
-        self.instr = "addi"
+        self.op = "addi"
         self.args = (reg, Zero(), num)
 
+
+def only_arith_instrs(instrs: List[Instr]) -> List[Instr]:
+    r = []
+    for instr in instrs:
+        if instr.op in Instr.arith_ops:
+            r.append(instr)
+    return r
 
 prog_start: List[Instr] = [Instr(".global _start"), Instr(""), Instr("_start:")]
 prog_end: List[Instr] = [Instr("addi", Regvar(7, 'null'), Zero(), 93), Instr("ecall")]
