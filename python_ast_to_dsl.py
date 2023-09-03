@@ -19,8 +19,8 @@ class Compiler:
         self.result += [Instr("addi", ReturnReg(), last, 0)]
         return self.result
 
-    def compile_input(self, e:str):
-        in_ast = parse(e, mode='eval')
+    def compile_input(self, input: str):
+        in_ast = parse(input, mode='eval')
         return self.compile(in_ast.body)
 
     def _transform_const(self, val: int) -> Reg:

@@ -2,6 +2,7 @@ from z3 import *
 from riscv_dsl import *
 from synthesis import *
 from typing import Callable, List
+from python_ast_to_func import user_to_func
 from dsl_to_func import to_func
 from python_ast_to_dsl import Compiler
 
@@ -17,6 +18,16 @@ class Verifier:
         self.args = args
         self.z3args = {repr(Zero()): BitVec("Zero", 64)}
         self.to_analyze = [repr(ReturnReg())] + [repr(Reg(x)) for x in [5, 6, 7, 28, 29, 30, 31]]
+
+    @classmethod
+    def fromStr(cls, s: str) -> "Verifier":
+        f, args = user_to_func(s)
+        return cls(f, args)
+    
+    @classmethod
+    def fromRiscv(cls, instrs: List[Instr]) -> "Verifier":
+        f, args = to_func(instrs)
+        return cls(f, args)
 
 
     # we cannot easily convert a list of instructions directly to z3 because registers may have different values at different points in the program
@@ -207,58 +218,6 @@ class Verifier:
 
 
 
-class DirectCegis(Verifier):
-    starting_impl: List[Instr]
-    slice_size = 3
-
-    def __init__(self, instrs: List[Instr]):
-        self.starting_impl = instrs
-        f, args = to_func(instrs)
-        super().__init__(f, args)
-
-
-    # this idea is currently not in use.
-    # at least one thing that is necessary to make it work would be to determine which registers
-    # are live at the end of a slice, and add this information to the equivalence check.
-    # we need to avoid overwriting live registers in the next slice.
-    # also would need to avoid including argument registers not in the original program in the final result
-
-    # def _cegis_3(self):
-    #     if (len(self.starting_impl) < 3):  # full program is only three instructions long already. just do regular cegis
-    #         return self.cegis_2()
-
-    #     sliced = []
-    #     result = []
-    #     rest = len(self.starting_impl) % self.slice_size
-    #     index = 0
-    #     for i in range(0, len(self.starting_impl) // self.slice_size):
-    #         sliced.append(self.starting_impl[index: index + 3])
-    #         index += self.slice_size + 1
-
-    #     sliced += [] if rest == 0 else [self.starting_impl[-rest:]]
-    #     for instr_slice in sliced:
-    #         slice_ceg = DirectCegis(instr_slice)
-    #         synth_slice = slice_ceg.cegis_2_modified()
-    #         # print(instr_slice)
-    #         if len(synth_slice) < 3:
-    #             result += synth_slice
-    #         else:
-    #             result += instr_slice
-    #     if result != self.starting_impl:
-    #         new_ceg = DirectCegis(result)
-    #         print(result)
-    #         return new_ceg.cegis_3()
-
-    #     return result
-
-    # def cegis_2_modified(self) -> List[Instr]:
-    #     res = super().cegis_2()
-    #     return res
-
-            
-
-
-
 if __name__ == "__main__":
     synth = Verifier(lambda x1: x1 + 1, ['x1'])
     synth.verify([Instr("addi", ReturnReg(), Regvar(2, 'x1'), 1)])
@@ -276,8 +235,8 @@ if __name__ == "__main__":
     print("\n(x + 2) / 4")
     # testing with using direct riscv input
     c = Compiler()
-    # synth3 = DirectCegis(c.compile_input('(x + 2) / 4'))
-    # print("\n".join(repr(x) for x in synth3.cegis_2()))
+    synth3 = Verifier.fromRiscv(c.compile_input('(x + 2) / 4'))
+    print("\n".join(repr(x) for x in synth3.cegis_2()))
 
     # testing overflow check
     x = BitVec('x', 64)
@@ -287,13 +246,8 @@ if __name__ == "__main__":
     synth.avoid_overflow(s, (x + 2) / 4)
     s.check()
 
-
-    # testing cegis 3
-    # print("\n ~~~~~~~~~~~~~\n")
-    # synth3 = DirectCegis(c.compile_input('(x + 2) / 4'))
-    # print("\n".join(repr(x) for x in synth3.cegis_3()))
     
     # testing bottom up
     print("\n ~~~~~~~~~~~~~\n")
-    synth4 = DirectCegis(c.compile_input('(x + 2) / 4 '))
+    synth4 = Verifier.fromRiscv(instrs=c.compile_input('(x + 2) / 4 '))
     print("\n".join(repr(x) for x in synth4.bottom_up()))

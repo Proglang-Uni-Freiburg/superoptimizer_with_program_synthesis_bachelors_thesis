@@ -2,6 +2,12 @@ from ast import *
 from typing import Callable, Tuple, List
 
 
+def user_to_func(s: str) -> Tuple[Callable[[List[int]], int], List[str]]:
+    s_parsed = parse(s, mode='eval')
+    return expr_to_func(s_parsed)  # convert input to python lambda with variables as args
+
+
+
 class TransformDiv(NodeTransformer):
 
     def visit_BinOp(self, node):
