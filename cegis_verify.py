@@ -235,7 +235,7 @@ if __name__ == "__main__":
     print("\n(x + 2) / 4")
     # testing with using direct riscv input
     c = Compiler()
-    synth3 = Verifier.fromRiscv(c.compile_input('(x + 2) / 4'))
+    synth3 = Verifier.fromRiscv(c.compile_input('(x + 2) * 4'))
     print("\n".join(repr(x) for x in synth3.cegis_2()))
 
     # testing overflow check
@@ -249,5 +249,5 @@ if __name__ == "__main__":
     
     # testing bottom up
     print("\n ~~~~~~~~~~~~~\n")
-    synth4 = Verifier.fromRiscv(instrs=c.compile_input('(x + 2) / 4 '))
+    synth4 = Verifier.fromRiscv(instrs=c.compile_input('(x % 2) '))
     print("\n".join(repr(x) for x in synth4.bottom_up()))

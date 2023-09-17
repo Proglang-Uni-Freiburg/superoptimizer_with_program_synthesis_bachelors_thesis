@@ -15,6 +15,9 @@ class TransformDiv(NodeTransformer):
             case BinOp(left=leftval, op=Div() | FloorDiv(), right=rightval):
                 replacement = Call(func=Name(id='pydiv', ctx=Load()), args=[leftval, rightval], keywords=[])
                 return replacement
+            case BinOp(left=leftval, op=Mod(), right=rightval):
+                replacement = Call(func=Name(id='pymod', ctx=Load()), args=[leftval, rightval], keywords=[])
+                return replacement
             case BinOp(left=leftval, op=opval, right=rightval):
                 new_left = self.visit(leftval)
                 new_right = self.visit(rightval)

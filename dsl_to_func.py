@@ -34,6 +34,8 @@ def _to_ast(operator: str, arg1: str | BinOp | Call, arg2: str | int | BinOp | C
             opval = Mult()
         case "div":
             return Call(func=Name(id='pydiv', ctx=Load()), args=[leftval, rightval], keywords=[])
+        case "rem":
+            return Call(func=Name(id='pymod', ctx=Load()), args=[leftval, rightval], keywords=[])
         case "slli":
             opval = LShift()
         case "srai":

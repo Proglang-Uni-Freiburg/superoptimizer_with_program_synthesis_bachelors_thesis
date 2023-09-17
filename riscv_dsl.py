@@ -1,9 +1,10 @@
 # base class for arithmetic RISC V assembly instructions
 from typing import List, Callable, Any
-from z3 import BitVecRef, BV2Int
+from z3 import BitVecRef, BV2Int, SRem
 
 
 pydiv =  lambda x, y: int(x / y) if type(x) is int and type(y) is int else x / y
+pymod = lambda x, y: (x - y * pydiv(x, y)) if type(x) is int and type(y) is int else SRem(x, y)
 
 def match_op(op: str) -> Callable[[Any, Any], Any]:
     match op:
@@ -20,7 +21,7 @@ def match_op(op: str) -> Callable[[Any, Any], Any]:
         case "div":
             return lambda x, y: pydiv(x, y)
         case "rem":  # remainder, signed
-            return lambda x, y: x % y
+            return lambda x, y: pymod(x, y)
         case _:
             raise Exception("Could not match Instruction Operator")
 
