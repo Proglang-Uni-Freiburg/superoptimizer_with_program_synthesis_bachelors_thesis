@@ -4,7 +4,7 @@ from z3 import BitVecRef, BV2Int, SRem
 
 
 pydiv =  lambda x, y: int(x / y) if type(x) is int and type(y) is int else x / y
-pymod = lambda x, y: (x - y * pydiv(x, y)) if type(x) is int and type(y) is int else SRem(x, y)
+pymod = lambda x, y: (x - (y * int(x / y))) if type(x) is int and type(y) is int else SRem(x, y)
 
 def match_op(op: str) -> Callable[[Any, Any], Any]:
     match op:
@@ -45,7 +45,7 @@ class Reg:
 
 
 class Regvar(Reg):
-    var_regs: List[int] = list(range(2, 8))
+    var_regs: List[int] = list(range(1, 8))
     name: str
 
     def __init__(self, num: int, name: str):

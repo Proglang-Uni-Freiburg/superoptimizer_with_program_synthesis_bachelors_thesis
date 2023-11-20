@@ -29,7 +29,7 @@ def identify_reg(s: str) -> Reg:
     if s[0] == 'a':
         if s[1] == '0':
             return ReturnReg()
-        return Regvar(int(s[1:]), s[1:])
+        return Regvar(int(s[1:]), s)
     if s[0] == 'x':
         if s[1] == '0':
             return Zero()

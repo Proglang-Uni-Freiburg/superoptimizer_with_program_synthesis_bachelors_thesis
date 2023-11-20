@@ -206,7 +206,7 @@ class RiscvGen():
                 success = True
                 try:
                     match p:
-                        case [Instr("addi", _), Instr('srai', _)]:
+                        case [_, Instr("rem", _)]:
                             pass
                     r = run_riscv(p, {self.args[i]: inputs[i] for i in range(len(self.args))}, self.s)
                     self.s.add(r == output)
@@ -228,81 +228,6 @@ class RiscvGen():
             return self.dp_gen(examples, min_prog_length + 1)
         raise Exception("No posssible program was found!")
 
-    # the same as smart_sketches, except with DP
-    # NOTE: replaced by dp_sketches_yield
-    # def dp_sketches(self, depth: int):
-
-    #     def helper(iter: int, reg_iter: int, temp_r: List[Instr], avail_regs: List[Reg]):
-    #         result = []
-    #         if (iter, reg_iter) in self.cache.keys():
-    #             return self.cache[iter, reg_iter]
-    #         if iter == 0:
-    #             possibilities = []
-    #             for op in self.arith_ops_imm:
-    #                 possibilities += [[Instr(op, ReturnReg(), arg, self.consts[iter])] for arg in avail_regs]
-    #             for op in self.arith_ops:
-    #                 if op in ['div', 'sub', 'rem']:
-    #                     possibilities += [[Instr(op, ReturnReg(), arg1, arg2)] for arg1, arg2 in list(itertools.product(avail_regs, avail_regs)) if repr(arg1) != repr(arg2)]
-    #                 else:
-    #                     possibilities += [[Instr(op, ReturnReg(), arg1, arg2)] for arg1, arg2 in list(itertools.product(avail_regs, avail_regs))]
-    #             return possibilities
-
-    #         new_regs = avail_regs.copy()
-    #         new_r = temp_r.copy()
-    #         if reg_iter < len(Reg.const_regs):
-    #             new_regs.append(Reg(Reg.const_regs[reg_iter]))
-    #         diff = [x for x in new_regs if x not in avail_regs]
-
-    #         for op in self.arith_ops_imm:
-    #             for dest in new_regs:
-    #                 for arg in avail_regs + [Zero()]:
-    #                     new_instr = [Instr(op, dest, arg, self.consts[iter])]
-    #                     new_r += new_instr
-    #                     if dest in diff:
-    #                         res = helper(iter - 1, reg_iter + 1, new_r, new_regs)
-    #                         self.cache[iter - 1, reg_iter + 1] = res
-    #                         result += [new_instr + x for x in res]
-    #                     else:
-    #                         res = helper(iter - 1, reg_iter, new_r, avail_regs)
-    #                         self.cache[iter - 1, reg_iter] = res
-    #                         result += [new_instr + x for x in res]
-    #                     new_r.pop()
-
-    #         for op in self.arith_ops:
-    #             for dest in new_regs:
-    #                 for arg1 in avail_regs + [Zero()]:
-    #                     for arg2 in avail_regs + [Zero()]:
-    #                         # eliminate redundant programs here
-    #                         if (op == "mul" or op == "add") and repr(arg1) > repr(arg2):
-    #                             continue
-    #                         if (op in ['div', 'rem', 'sub']) and repr(arg1) == repr(arg2):
-    #                             continue
-                            
-    #                         new_instr = [Instr(op, dest, arg1, arg2)]
-    #                         new_r += new_instr
-    #                         if dest in diff:
-    #                             res = helper(iter - 1, reg_iter + 1, new_r, new_regs)
-    #                             self.cache[iter - 1, reg_iter + 1] = res
-    #                             result += [new_instr + x for x in res]
-    #                         else:
-    #                             res = helper(iter - 1, reg_iter, new_r, avail_regs)
-    #                             self.cache[iter - 1, reg_iter] = res
-    #                             result += [new_instr + x for x in res]
-    #                         new_r.pop()
-    #         return result
-
-    #     possibilities = []
-    #     self.s = Solver()
-    #     self.consts = []
-    #     for i in range(depth + 1):
-    #         c = BitVec('c' + str(i), 64)
-    #         self.s.add(c >= self.c_min)
-    #         self.s.add(c <= self.c_max)
-    #         self.consts += [c]
-    #     avail_regs = self.arg_regs
-    #     possibilities = helper(depth, 0, [], avail_regs)
-        
-    #     return possibilities
     
     # iterative memoization itself was not an improvement to the recursive dp version. However, this version was adapted to use utilize
     # multithreading as well as yield
@@ -350,6 +275,7 @@ class RiscvGen():
             end_list = {}
             for reg_iter in range(0, iter + 1):
                 new_regs = avail_regs.copy()
+                new_regs.append(Zero())
                 for i in range(min(reg_iter, len(Reg.const_regs))):
                     new_regs.append(Reg(Reg.const_regs[i]))
 

@@ -4,7 +4,9 @@ from synthesis import *
 from typing import Callable, List
 from python_ast_to_func import user_to_func
 from dsl_to_func import to_func
+from memory_profiler import profile
 from python_ast_to_dsl import Compiler
+import ast as ast
 
 
 class Verifier:
@@ -18,6 +20,9 @@ class Verifier:
         self.args = args
         self.z3args = {repr(Zero()): BitVec("Zero", 64)}
         self.to_analyze = [repr(ReturnReg())] + [repr(Reg(x)) for x in [5, 6, 7, 28, 29, 30, 31]]
+        # hack to force usage of remainder instead of python modulo in Z3
+        BitVecRef.__mod__ = lambda self, other: SRem(self, other)
+        BitVecRef.__rmod__ = lambda self, other: SRem(self, other)
 
     @classmethod
     def fromStr(cls, s: str) -> "Verifier":
@@ -114,7 +119,7 @@ class Verifier:
     def _avoid_zero_div(self, s, expr):
         if type(expr) is int or expr.num_args() < 2:
             return
-        if expr.decl().name() == 'bvsdiv':
+        if expr.decl().name() == 'bvsdiv' or expr.decl().name() == 'bvsrem':
             s.add(expr.arg(1) != 0)
             return
         for i in range(expr.num_args()):
@@ -160,12 +165,11 @@ class Verifier:
             examples = [(example_args, self.goal_func(*example_args))]
 
         while(True):
-            if generator_used == RiscvGen.naive_gen:
+            if generator_used.__func__ == RiscvGen.naive_gen:
                 guess = generator_used(examples)
             else:
                 guess, min_len = generator_used(examples, min_len)
 
-            # print(guess)
             example_args, success = self.cegis_counter(guess, s)
             if success:
                 return guess
@@ -182,10 +186,12 @@ class Verifier:
         gen = RiscvGen(self.args)
         return self.cegis_general(gen.smart_gen)
 
+    # uses generator and dynamic programming
     def cegis_2(self):
         gen = RiscvGen(self.args)
         return self.cegis_general(gen.dp_gen)
 
+    # does not use cegis but just bottom up enumeration
     def bottom_up(self):
         gen = RiscvGen(self.args)
         s = Solver()
@@ -201,6 +207,8 @@ class Verifier:
             s.add(self.z3args[arg] >= -256)
 
         for i in range(max_depth):
+            if len(self.args) == 2:
+                x = self.goal_func(2, 3)
             for candidate in gen.dp_sketches_yield(i):
                 s = gen.s
                 s.push()
@@ -208,13 +216,15 @@ class Verifier:
                 func_res = self.goal_func(*[self.z3args[x] for x in self.args])
                 self._avoid_zero_div(s, func_res)
                 forall_args = [val for key, val in self.z3args.items() if key != repr(Zero())]
-                s.add(ForAll(forall_args, cand_res == func_res))
+                if forall_args != []:
+                    s.add(ForAll(forall_args, cand_res == func_res))
+                else:
+                    s.add(cand_res == func_res)
                 if s.check() == sat:
                     new_cand = gen.replace_consts(candidate)
                     return new_cand
                 s.pop()
                 gen.s = s
-
 
 
 
@@ -232,7 +242,7 @@ if __name__ == "__main__":
     synth2 = Verifier(lambda x1, x2: (x1 - x1) + (x2 - 3) * 2 - x2, ['x1', 'x2'])
     print("\n".join(repr(x) for x in synth2.cegis_2()))
 
-    print("\n(x + 2) / 4")
+    print("\n(x + 2) * 4")
     # testing with using direct riscv input
     c = Compiler()
     synth3 = Verifier.fromRiscv(c.compile_input('(x + 2) * 4'))

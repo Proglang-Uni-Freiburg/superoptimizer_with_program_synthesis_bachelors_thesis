@@ -1,5 +1,6 @@
 from ast import *
 from typing import Callable, Tuple, List
+from riscv_dsl import *
 
 
 def user_to_func(s: str) -> Tuple[Callable[[List[int]], int], List[str]]:
@@ -28,9 +29,10 @@ class TransformDiv(NodeTransformer):
 def expr_to_func(ast_in: Expression) -> Tuple[Callable[[List[int]], int], list[str]]:
     expr_vars = []
     expr_body = Constant(value=0)
-    for node in walk(ast_in):
+    with_fixed_div_mod = fix_missing_locations(TransformDiv().visit(ast_in))
+    for node in walk(with_fixed_div_mod):
         match node:
-            case Name(id, _) if id not in expr_vars:
+            case Name(id, _) if id not in expr_vars and id != 'pymod' and id != 'pydiv':
                 expr_vars.append(id)
             case Expression(body=b):  # for putting into lambda body later
                 
@@ -45,9 +47,12 @@ def expr_to_func(ast_in: Expression) -> Tuple[Callable[[List[int]], int], list[s
                                                  kw_defaults=[],
                                                  defaults=[]),
                                   body=expr_body))
+    x = dump(func)
     return eval(unparse(func)), expr_vars
 
 
 if __name__ == "__main__":
     ast_in = parse("x / 2 + 1", mode='eval')
     print(dump(fix_missing_locations(TransformDiv().visit(ast_in))))
+    f, vars = user_to_func('x % 3')
+    print(f(2))
